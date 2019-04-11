@@ -33,3 +33,36 @@ while maximum interations or minimum error criteria is not attained
 ## The General Idea
 
 The aim is to find an optimal tree given the input matrix.
+
+## Setup
+
+The setup is very easy, just install every package included in the project and run with the required arguments!
+
+I recommend creating a `virtualenv` with `python3`, because that's what I used:
+```shell
+$ virtualenv env -p `which python 3`
+$ source ./env/bin/activate
+```
+
+Now you should be in a situation like this:
+
+```shell
+(env) $ _ 
+```
+
+And then install every package necessary:
+
+```shell
+(env) $ pip install graphviz ete3
+```
+
+Done!
+
+## Examples
+
+Here's a list of examples that you can try:
+
+```shell
+(env) $ python main.py --infile "data/easy/3.txt" --mutations 8 --iterations 10 --mutfile "data/easy/3_mut.txt"
+```
+
