@@ -88,18 +88,15 @@ def pso(nparticles, iterations, helper, matrix):
             if (p.best_likelihood > helper.best_likelihood):
                 helper.best_likelihood = p.best_likelihood
                 helper.best_likelihood_particle = p
-            elif (p.best_likelihood < helper.best_likelihood):
-                blp = helper.best_likelihood_particle
-                new_particle_tree = blp.tree.copy_all()
-                new_particle_tree_list = copy.deepcopy(blp.tree_list)
-                new_particle_best_sigma = copy.deepcopy(blp.best_sigma)
-                new_particle_losses_list = copy.deepcopy(blp.losses_list)
-                new_particle_k_losses_list = copy.deepcopy(blp.k_losses_list)
+            # elif (p.best_likelihood < helper.best_likelihood):
+            #     blp = helper.best_likelihood_particle
+            #     new_particle_tree = blp.tree.copy_all()
+            #     new_particle_tree_list = copy.deepcopy(blp.tree_list)
+            #     new_particle_best_sigma = copy.deepcopy(blp.best_sigma)
+            #     new_particle_losses_list = copy.deepcopy(blp.losses_list)
+            #     new_particle_k_losses_list = copy.deepcopy(blp.k_losses_list)
 
-                particles[j] = TreeHelper(new_particle_tree, new_particle_tree_list, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
-
-    for i, p in enumerate(particles):
-        p.tree.save("trees/tree_" + str(i) + ".gv")
+            #     particles[j] = TreeHelper(new_particle_tree, new_particle_tree_list, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
 
 def particle_operation(helper, particle, operation):
     if operation < 0.25:
@@ -118,7 +115,7 @@ def particle_operation(helper, particle, operation):
         return switch_nodes(helper, particle)
     else:
         # prune-regraft two random nodes
-        return 2
+        return prune_regraft(helper, particle)
 
 def _generate_random_btree(mutations, mutation_names):
     """ Generates a random binary tree """
@@ -192,21 +189,56 @@ def mutation_delete(helper, tree_helper):
     return 0
 
 def switch_nodes(helper, tree_helper):
-    u = None
     cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
     keys = list(cached_content.keys())
+
+    u = None
     while (u == None or u.up == None or u.loss):
         u = r.choice(keys)
+        keys.remove(u)
     v = None
+    keys = list(cached_content.keys())
     while (v == None or v.up == None or v.loss):
         v = r.choice(keys)
+        keys.remove(v)
 
-    if u == v:
+    if u.uid == v.uid:
         return 1
-    u.replace(v)
+
+    if u.loss:
+        tree_helper.losses_list.remove(u)
+
+    u.swap(v)
+
+    if v.loss:
+        tree_helper.losses_list.append(v)
+
     u.fix_for_losses(helper, tree_helper)
     v.fix_for_losses(helper, tree_helper)
     return 0
+
+def prune_regraft(helper, tree_helper):
+    cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
+    keys = list(cached_content.keys())
+
+    prune_res = 0
+    pruned_node = None
+    while prune_res != 0:
+        u = None
+        while (u == None or u.up == None or u.loss):
+            u = r.choice(keys)
+            keys.remove(u)
+        v = None
+        keys = list(cached_content.keys())
+        while (v == None or v.up == None or v.loss):
+            v = r.choice(keys)
+            keys.remove(v)
+        prune_res = u.prune_and_reattach(v)
+        pruned_node = u
+    if pruned_node is not None:
+        pruned_node.fix_for_losses(helper, tree_helper)
+        return 0
+    return 1
 
 def prob(I, E, genotypes, helper, tree_helper):
     p = 0

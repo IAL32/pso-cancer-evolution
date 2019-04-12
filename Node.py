@@ -121,8 +121,19 @@ class Node(Tree):
 
     def prune_and_reattach(self, node_reattach):
         """ Detaches current node (with all its descendants) and reattaches it into another node """
+
+        if node_reattach.is_ancestor_of(self):
+            return 1
+        if node_reattach.up == self:
+            return 1
+        if self.up is None:
+            return 1
+        if self.uid == node_reattach.uid:
+            return 1
+
         self.detach()
         node_reattach.add_child(self)
+        return 0
     
     def copy_from(self, node):
         self.uid = node.uid
@@ -130,7 +141,7 @@ class Node(Tree):
         self.mutation_id = node.mutation_id
         self.loss = node.loss
 
-    def replace(self, node):
+    def swap(self, node):
         """ Switch this data with with that of another node """
         tmp_uid = self.uid
         tmp_name = self.name
@@ -171,7 +182,7 @@ class Node(Tree):
             out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
             out += self._to_dot_node(self.uid, props={"label": self.name})
         for n in self.children:
-            props = {"label": n.name + "\nL: " + str(self.loss)}
+            props = {"label": n.name}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
             out += self._to_dot_node(n.uid, props=props)
