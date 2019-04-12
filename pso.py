@@ -4,7 +4,7 @@ import random as r
 import math
 import copy
 from multiprocessing import Pool as ThreadPool
-r.seed(1)
+# r.seed(1)
 
 class TreeHelper(object):
 
@@ -69,12 +69,17 @@ def pso(nparticles, iterations, helper, matrix):
             helper.best_likelihood_particle = p
 
     for i in range(iterations): # number of iterations as stop criteria
-        print ("----------------")
-        print ("Iteration n. " + str(i))
+        if i == 0 or i % 1000 == 0:
+            print ("----------------")
+            print ("Iteration n. " + str(i))
+            print ("Best lh: " + str(helper.best_likelihood))
+            print ("----------------")
 
-        for i, p in enumerate(particles):
-            print ("Particle n. " + str(i))
-            print ("- loglh: " + str(p.best_likelihood))
+        for j, p in enumerate(particles):
+            if i == 0 or i % 1000 == 0:
+                p.tree.save("trees/tree_" + str(i) + "_" + str(j) + ".gv")
+                print ("Particle n. " + str(j))
+                print ("- loglh: " + str(p.best_likelihood))
             operation = r.random()
             op_result = particle_operation(helper, p, operation)
             if op_result == 0:
@@ -83,7 +88,7 @@ def pso(nparticles, iterations, helper, matrix):
             if (p.best_likelihood > helper.best_likelihood):
                 helper.best_likelihood = p.best_likelihood
                 helper.best_likelihood_particle = p
-            if (p.best_likelihood < helper.best_likelihood):
+            elif (p.best_likelihood < helper.best_likelihood):
                 blp = helper.best_likelihood_particle
                 new_particle_tree = blp.tree.copy_all()
                 new_particle_tree_list = copy.deepcopy(blp.tree_list)
@@ -91,12 +96,10 @@ def pso(nparticles, iterations, helper, matrix):
                 new_particle_losses_list = copy.deepcopy(blp.losses_list)
                 new_particle_k_losses_list = copy.deepcopy(blp.k_losses_list)
 
-                p = TreeHelper(new_particle_tree, new_particle_tree_list, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
+                particles[j] = TreeHelper(new_particle_tree, new_particle_tree_list, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
 
-    i = 0
-    for p in particles:
+    for i, p in enumerate(particles):
         p.tree.save("trees/tree_" + str(i) + ".gv")
-        i += 1
 
 def particle_operation(helper, particle, operation):
     if operation < 0.25:
@@ -127,7 +130,8 @@ def _generate_random_btree(mutations, mutation_names):
 
     nodes = [root]
     append_node = 0
-    for i in range(mutations):
+    i = 0
+    while i < mutations:
         nodes.append(
             Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
         )
@@ -138,6 +142,7 @@ def _generate_random_btree(mutations, mutation_names):
                 Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
             )
         append_node += 1
+        i += 1
     
     return root
 
@@ -230,24 +235,28 @@ def prob(I, E, genotypes, helper, tree_helper):
 def greedy_tree_loglikelihood(helper, tree_helper):
     cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
 
-    node_max = len(cached_content)
-    node_genotypes = [[0 for j in range(helper.mutations)] for i in range(node_max)]
-    
-    for i in range(node_max):
-        if (i >= 0 and i < helper.mutations):
-            node = list(cached_content.keys())[i]
+    node_count = len(cached_content)
+    nodes_list = list(cached_content.keys())
+    node_genotypes = [
+        [0 for j in range(helper.mutations)]
+        for i in range(node_count)
+    ]
+
+    for i in range(node_count):
+        if (i in range(helper.mutations)):
+            node = nodes_list[i]
             node.get_genotype_profile(node_genotypes[i])
         else:
             for j in range(helper.mutations):
                 node_genotypes[i][j] = 3
-    
+
     maximum_likelihood = 0
 
     for i in range(helper.cells):
         best_sigma = -1
         best_lh = float("-inf")
 
-        for n in range(node_max):
+        for n in range(node_count):
             if node_genotypes[n][0] != 3:
                 lh = 0
                 for j in range(helper.mutations):

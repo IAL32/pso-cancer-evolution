@@ -38,16 +38,19 @@ class Node(Tree):
     loss = property(fget=_get_loss, fset=_set_loss)
 
     def fix_for_losses(self, helper, tree_helper):
+
+        if not self.is_leaf():
+            self.children[0].fix_for_losses(helper, tree_helper)
+        next_sibling = self.next_sibling()
+        if next_sibling:
+            next_sibling.fix_for_losses(helper, tree_helper)
+
         if self.loss:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
             if not valid or lost:
                 self.delete_b(helper, tree_helper)
-        if self.is_leaf():
-            return
-        for child in self.children:
-            child.fix_for_losses(helper, tree_helper)
     
     def delete_b(self, helper, tree_helper):
         tree_helper.losses_list.remove(self)
@@ -76,17 +79,41 @@ class Node(Tree):
     def is_loss_valid(self):
         """ Checks if current node mutation is valid up until the root node """
         for par in self.iter_ancestors():
-            if par.mutation_id != self.mutation_id:
-                return False
-        return True
+            if par.mutation_id == self.mutation_id:
+                return True
+        return False
 
     def is_mutation_already_lost(self, mutation_id):
         """ Checks if mutation is already lost in the current tree """
         for par in self.iter_ancestors():
-            if par.loss == True and par.mutation_id == mutation_id:
+            if par.loss and par.mutation_id == mutation_id:
                 return True
         
         return False
+
+    def previous_sibling(self):
+        " Returns the previous sibling, if it exists "
+        if self.up is None:
+            return None
+        if len(self.up.children) == 1:
+            return None
+        self_position = self.up.children.index(self)
+        if self_position - 1 == -1:
+            return None
+        sibling_position = self_position - 1
+        return self.up.children[sibling_position]
+
+    def next_sibling(self):
+        " Returns the next sibling, if it exists "
+        if self.up is None:
+            return None
+        if len(self.up.children) == 1: # single node
+            return None
+        self_position = self.up.children.index(self)
+        if self_position + 1 == len(self.up.children):
+            return None
+        sibling_position = self_position + 1
+        return self.up.children[sibling_position]
 
     def is_ancestor_of(self, node):
         """ Checks if current node is parent of the given arguent node """
@@ -144,12 +171,9 @@ class Node(Tree):
             out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
             out += self._to_dot_node(self.uid, props={"label": self.name})
         for n in self.children:
-            props = {"label": n.name}
+            props = {"label": n.name + "\nL: " + str(self.loss)}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
-                for a in n.iter_ancestors():
-                    if not a.loss and self.mutation_id == a.mutation_id:
-                        out += self._to_dot_node(self.uid, a.uid)
             out += self._to_dot_node(n.uid, props=props)
             out += self._to_dot_node(self.uid, n.uid)
             if not n.is_leaf():
@@ -158,15 +182,16 @@ class Node(Tree):
         if not self.up: # first
             out += '\n}\n'
         return out
-    
+
     def get_genotype_profile(self, genotypes):
+        " Walks up to the root and maps the genotype for the current node mutation "
         if self.mutation_id == -1:
             return
-        if self.loss == 0:
+        if not self.loss:
             genotypes[self.mutation_id] += 1
         else:
             genotypes[self.mutation_id] -= 1
-        
+
         self.up.get_genotype_profile(genotypes)
 
     def save(self, filename="test.gv"):
