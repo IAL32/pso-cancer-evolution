@@ -4,54 +4,15 @@ import random as r
 import math
 import copy
 from multiprocessing import Pool as ThreadPool
-# r.seed(1)
-
-class TreeHelper(object):
-
-    def __init__(self, tree, tree_list, best_likelihood, best_sigma, losses_list, k_losses_list, velocity):
-        self.swap(tree, tree_list, best_likelihood, best_sigma, losses_list, k_losses_list, velocity)
-
-    def swap(self, tree, tree_list, best_likelihood, best_sigma, losses_list, k_losses_list, velocity):
-        self.tree = tree
-        self.tree_list = tree_list
-        self.best_likelihood = best_likelihood
-        self.best_sigma = best_sigma
-        self.losses_list = losses_list
-        self.k_losses_list = k_losses_list
-        self.velocity = velocity
-
-    @classmethod
-    def fromscratch(cls, cells, mutations, tree):
-        tree_list = [n for n in tree.traverse()]
-        best_likelihood = float("-inf")
-        best_sigma = [None] * cells
-        losses_list = []
-        k_losses_list = [0] * mutations
-        velocity = 0
-        return cls(tree, tree_list, best_likelihood, best_sigma, losses_list, k_losses_list, velocity)
-
-class Helper(object):
-
-    def __init__(self, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, inertia, vmax):
-        self.matrix = matrix
-        self.mutations = mutations
-        self.mutation_names = mutation_names
-        self.cells = cells
-        self.alpha = alpha
-        self.beta = beta
-        self.k = k
-        self.c1 = c1
-        self.c2 = c2
-        self.inertia = inertia
-        self.vmax = vmax
-        self.best_likelihood = float("-inf")
-        self.best_likelihood_particle = None
+from TreeHelper import TreeHelper
+from Operation import Operation as Op
+from Helper import Helper
+r.seed(1)
 
 def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, inertia, vmax):
     helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, inertia, vmax)
 
     pso(nparticles, iterations, helper, matrix)
-
 
 def pso(nparticles, iterations, helper, matrix):
     # Particle initialization
@@ -62,11 +23,13 @@ def pso(nparticles, iterations, helper, matrix):
         for n in range(nparticles)
     ]
 
-    for p in particles:
+    for j, p in enumerate(particles):
         p.best_likelihood = greedy_tree_loglikelihood(helper, p)
         if (p.best_likelihood > helper.best_likelihood):
             helper.best_likelihood = p.best_likelihood
             helper.best_likelihood_particle = p
+        print ("Particle n. " + str(j))
+        print ("- loglh: " + str(p.best_likelihood))
 
     for i in range(iterations): # number of iterations as stop criteria
         if i == 0 or i % 1000 == 0:
@@ -77,7 +40,7 @@ def pso(nparticles, iterations, helper, matrix):
 
         for j, p in enumerate(particles):
             if i == 0 or i % 1000 == 0:
-                p.tree.save("trees/tree_" + str(i) + "_" + str(j) + ".gv")
+                # p.tree.save("trees/tree_" + str(i) + "_" + str(j) + ".gv")
                 print ("Particle n. " + str(j))
                 print ("- loglh: " + str(p.best_likelihood))
             operation = r.random()
@@ -91,22 +54,31 @@ def pso(nparticles, iterations, helper, matrix):
             # elif (p.best_likelihood < helper.best_likelihood):
             #     blp = helper.best_likelihood_particle
             #     new_particle_tree = blp.tree.copy_all()
-            #     new_particle_tree_list = copy.deepcopy(blp.tree_list)
             #     new_particle_best_sigma = copy.deepcopy(blp.best_sigma)
             #     new_particle_losses_list = copy.deepcopy(blp.losses_list)
             #     new_particle_k_losses_list = copy.deepcopy(blp.k_losses_list)
 
-            #     particles[j] = TreeHelper(new_particle_tree, new_particle_tree_list, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
+            #     particles[j] = TreeHelper(new_particle_tree, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
+        for j, p in enumerate(particles):
+            if (p.best_likelihood < helper.best_likelihood):
+                blp = helper.best_likelihood_particle
+                n_tree = blp.original.copy()
+                new_particle = TreeHelper.fromscratch(helper.cells, helper.mutations, n_tree)
+
+                Op.do_list(helper, new_particle, blp.operations[:-1])
+                new_particle.best_likelihood = greedy_tree_loglikelihood(helper, new_particle)
+
+                particles[j] = new_particle
 
 def particle_operation(helper, particle, operation):
     if operation < 0.25:
         # back-mutation
-        back_res = add_back_mutation(helper, particle, helper.k)
 
+        back_res = add_back_mutation(helper, particle)
         if back_res == 0:
             particle.tree.fix_for_losses(helper, particle)
-            return 1
-        return 0
+            return 0
+        return 1
     elif operation < 0.50:
         # delete random mutation
         return mutation_delete(helper, particle)
@@ -143,8 +115,9 @@ def _generate_random_btree(mutations, mutation_names):
     
     return root
 
-def add_back_mutation(helper, tree_helper, max_losses):
+def add_back_mutation(helper, tree_helper):
 
+    max_losses = helper.k
     cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
     keys = list(cached_content.keys())
     node = r.choice(keys)
@@ -177,6 +150,8 @@ def add_back_mutation(helper, tree_helper, max_losses):
     par.add_child(node_deletion)
     node_deletion.add_child(current)
 
+    tree_helper.operations.append(Op(Op.BACK_MUTATION, node.uid, candidate.uid))
+    
     return 0
 
 def mutation_delete(helper, tree_helper):
@@ -186,6 +161,7 @@ def mutation_delete(helper, tree_helper):
     node_delete = r.choice(tree_helper.losses_list)
     node_delete.delete_b(helper, tree_helper)
 
+    tree_helper.operations.append(Op(Op.DELETE_MUTATION, node_delete.uid))
     return 0
 
 def switch_nodes(helper, tree_helper):
@@ -205,16 +181,14 @@ def switch_nodes(helper, tree_helper):
     if u.uid == v.uid:
         return 1
 
-    if u.loss:
-        tree_helper.losses_list.remove(u)
+    # appending before switch happens
+    tree_helper.operations.append(Op(Op.SWITCH_NODES, u.uid, v.uid))
 
     u.swap(v)
 
-    if v.loss:
-        tree_helper.losses_list.append(v)
-
     u.fix_for_losses(helper, tree_helper)
     v.fix_for_losses(helper, tree_helper)
+
     return 0
 
 def prune_regraft(helper, tree_helper):
@@ -234,8 +208,10 @@ def prune_regraft(helper, tree_helper):
             v = r.choice(keys)
             keys.remove(v)
         prune_res = u.prune_and_reattach(v)
-        pruned_node = u
+        if prune_res == 0:
+            pruned_node = u
     if pruned_node is not None:
+        tree_helper.operations.append(Op(Op.PRUNE_REGRAFT, pruned_node.uid, v.uid))
         pruned_node.fix_for_losses(helper, tree_helper)
         return 0
     return 1

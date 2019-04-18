@@ -19,7 +19,7 @@ Options:
     -k=<k>                                  K value of Dollo(k) model used as phylogeny tree [default: 3].
     --c1=<c1>                               Learning factor 1 [default: 2].
     --c2=<c2>                               Learning factor 2 [default: 2].
-    --inertia=<w>                           Inertial parameter. Affects the movement propagation given the last velocity value [default: 0.5].
+    --inertia=<w>                           Inertial parameter. Affects the movement propagation given the last velocity value [default: 1.0].
     --vmax=<vmax>                           Maximum particle velocity [default: 50].
 """
 

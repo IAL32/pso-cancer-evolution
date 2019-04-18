@@ -60,6 +60,9 @@ class Node(Tree):
         # TODO: workout how can sigma be done
         # for i in range(helper.cells):
 
+    def find_node_by_uid(self, uid):
+        return next(self.iter_search_nodes(uid = uid))
+
     def copy_all(self):
         cached_content = self.get_cached_content(leaves_only=False)
         return self.copy_until_depth(len(cached_content))
