@@ -14,33 +14,33 @@ class Operation(object):
         self.node_uid_3 = node_uid_3
     
     @staticmethod
-    def do(operation, helper, tree_helper):
+    def do(operation, helper, particle):
         if (operation.type == Operation.BACK_MUTATION):
-            Operation._back_mutation(operation, helper, tree_helper)
+            Operation._back_mutation(operation, helper, particle)
 
-            tree_helper.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2, operation.node_uid_3))
+            particle.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2, operation.node_uid_3))
         elif (operation.type == Operation.DELETE_MUTATION):
-            Operation._delete_mutation(operation, helper, tree_helper)
+            Operation._delete_mutation(operation, helper, particle)
 
-            tree_helper.operations.append(Operation(operation.type, operation.node_uid_1))
+            particle.operations.append(Operation(operation.type, operation.node_uid_1))
         elif (operation.type == Operation.SWITCH_NODES):
-            Operation._switch_nodes(operation, helper, tree_helper)
+            Operation._switch_nodes(operation, helper, particle)
 
-            tree_helper.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2))
+            particle.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2))
         elif (operation.type == Operation.PRUNE_REGRAFT):
-            Operation._prune_regraft(operation, helper, tree_helper)
+            Operation._prune_regraft(operation, helper, particle)
 
-            tree_helper.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2))
+            particle.operations.append(Operation(operation.type, operation.node_uid_1, operation.node_uid_2))
 
     @staticmethod
-    def _back_mutation(op, helper, tree_helper):
-        node = tree_helper.tree.find_node_by_uid(op.node_uid_1)
-        candidate = tree_helper.tree.find_node_by_uid(op.node_uid_2)
+    def _back_mutation(op, helper, particle):
+        node = particle.tree.find_node_by_uid(op.node_uid_1)
+        candidate = particle.tree.find_node_by_uid(op.node_uid_2)
         
         node_deletion = Node(candidate.name, None, candidate.mutation_id, op.node_uid_3)
 
-        tree_helper.losses_list.append(node_deletion)
-        tree_helper.k_losses_list[node_deletion.mutation_id] += 1
+        particle.losses_list.append(node_deletion)
+        particle.k_losses_list[node_deletion.mutation_id] += 1
 
         par = node.up
         current = node.detach()
@@ -48,32 +48,32 @@ class Operation(object):
         node_deletion.add_child(current)
 
     @staticmethod
-    def _delete_mutation(op, helper, tree_helper):
-        node_delete = tree_helper.tree.find_node_by_uid(op.node_uid_1)
-        node_delete.delete_b(helper, tree_helper)
+    def _delete_mutation(op, helper, particle):
+        node_delete = particle.tree.find_node_by_uid(op.node_uid_1)
+        node_delete.delete_b(helper, particle)
 
-        tree_helper.operations.append(Operation(op.type, op.node_uid_1))
+        particle.operations.append(Operation(op.type, op.node_uid_1))
 
     @staticmethod
-    def _switch_nodes(op, helper, tree_helper):
-        u = tree_helper.tree.find_node_by_uid(op.node_uid_1)
-        v = tree_helper.tree.find_node_by_uid(op.node_uid_2)
+    def _switch_nodes(op, helper, particle):
+        u = particle.tree.find_node_by_uid(op.node_uid_1)
+        v = particle.tree.find_node_by_uid(op.node_uid_2)
 
         u.swap(v)
 
-        u.fix_for_losses(helper, tree_helper)
-        v.fix_for_losses(helper, tree_helper)
+        u.fix_for_losses(helper, particle)
+        v.fix_for_losses(helper, particle)
 
     @staticmethod
-    def _prune_regraft(op, helper, tree_helper):
-        u = tree_helper.tree.find_node_by_uid(op.node_uid_1)
-        v = tree_helper.tree.find_node_by_uid(op.node_uid_2)
+    def _prune_regraft(op, helper, particle):
+        u = particle.tree.find_node_by_uid(op.node_uid_1)
+        v = particle.tree.find_node_by_uid(op.node_uid_2)
 
         u.prune_and_reattach(v)
 
-        u.fix_for_losses(helper, tree_helper)
+        u.fix_for_losses(helper, particle)
 
     @staticmethod
-    def do_list(helper, tree_helper, operations):
+    def do_list(helper, particle, operations):
         for op in operations:
-            Operation.do(op, helper, tree_helper)
+            Operation.do(op, helper, particle)

@@ -37,24 +37,24 @@ class Node(Tree):
     mutation_id = property(fget=_get_mutation_id, fset=_set_mutation_id)
     loss = property(fget=_get_loss, fset=_set_loss)
 
-    def fix_for_losses(self, helper, tree_helper):
+    def fix_for_losses(self, helper, particle):
 
         if not self.is_leaf():
-            self.children[0].fix_for_losses(helper, tree_helper)
+            self.children[0].fix_for_losses(helper, particle)
         next_sibling = self.next_sibling()
         if next_sibling:
-            next_sibling.fix_for_losses(helper, tree_helper)
+            next_sibling.fix_for_losses(helper, particle)
 
         if self.loss:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
             if not valid or lost:
-                self.delete_b(helper, tree_helper)
+                self.delete_b(helper, particle)
     
-    def delete_b(self, helper, tree_helper):
-        tree_helper.losses_list.remove(self)
-        tree_helper.k_losses_list[self.mutation_id] -= 1
+    def delete_b(self, helper, particle):
+        particle.losses_list.remove(self)
+        particle.k_losses_list[self.mutation_id] -= 1
         self.delete()
 
         # TODO: workout how can sigma be done
@@ -158,6 +158,45 @@ class Node(Tree):
         node.mutation_id = tmp_mutation_id
         node.loss = tmp_loss
     
+    def get_clades_at_height(self, height=1):
+        " Returns a list of clades at the desired height "
+        tmp = []
+        for leaf in self.iter_leaves():
+            for cl in leaf._get_parent_at_height(height):
+                if len(tmp) > 0:
+                    if cl not in tmp:
+                        # temporary adding clade, as it will be checked later anyways
+                        tmp.append(cl)
+                else:
+                    tmp.append(cl)
+        clades = []
+
+        for cl in tmp:
+            add = True
+            for cl_ in tmp:
+                # skip same node
+                if not cl.uid == cl_.uid:
+                    # check all possible clades
+                    if cl_.is_ancestor_of(cl):
+                        add = False
+                        break
+            if add:
+                clades.append(cl)
+
+        return clades
+
+    def _get_parent_at_height(self, height=1):
+        " Support function that yields a clade at the desired height "
+        if not self.is_leaf():
+            raise SystemError("Trying to get clades from a non-leaf node")
+
+        par = self.up
+        climb = 0
+        while (par is not None and climb < height):
+            yield par
+            climb += 1
+            par = par.up
+
     def _to_dot_label(self, d={}):
         if not len(d):
             return ''
@@ -185,7 +224,7 @@ class Node(Tree):
             out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
             out += self._to_dot_node(self.uid, props={"label": self.name})
         for n in self.children:
-            props = {"label": n.name}
+            props = {"label": n.name + "\nuid: " + n.uid}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
             out += self._to_dot_node(n.uid, props=props)
@@ -207,6 +246,9 @@ class Node(Tree):
             genotypes[self.mutation_id] -= 1
 
         self.up.get_genotype_profile(genotypes)
+
+    def to_string(self):
+        return "[uid: " + str(self.uid) + "; dist: " + str(self.get_distance(self.get_tree_root())) + "]"
 
     def save(self, filename="test.gv"):
         Source(self.to_dot(), filename=filename, format="png").render()

@@ -1,4 +1,4 @@
-class TreeHelper(object):
+class Particle(object):
 
     def __init__(self, tree, best_likelihood, best_sigma, losses_list, k_losses_list, velocity, operations, original):
         self.swap(tree, best_likelihood, best_sigma, losses_list, k_losses_list, velocity, operations, original)

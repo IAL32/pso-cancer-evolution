@@ -3,8 +3,8 @@ from graphviz import Source
 import random as r
 import math
 import copy
-from multiprocessing import Pool as ThreadPool
-from TreeHelper import TreeHelper
+# from multiprocessing import Pool as ThreadPool
+from Particle import Particle
 from Operation import Operation as Op
 from Helper import Helper
 r.seed(1)
@@ -19,61 +19,27 @@ def pso(nparticles, iterations, helper, matrix):
 
     # initialization
     particles = [
-        TreeHelper.fromscratch(helper.cells, helper.mutations, _generate_random_btree(helper.mutations, helper.mutation_names))
+        Particle.fromscratch(helper.cells, helper.mutations, _generate_random_btree(helper.mutations, helper.mutation_names))
         for n in range(nparticles)
     ]
 
     for j, p in enumerate(particles):
+        p.tree.save("trees/tree_" + str(j) + ".gv")
         p.best_likelihood = greedy_tree_loglikelihood(helper, p)
         if (p.best_likelihood > helper.best_likelihood):
             helper.best_likelihood = p.best_likelihood
             helper.best_likelihood_particle = p
         print ("Particle n. " + str(j))
         print ("- loglh: " + str(p.best_likelihood))
+        print("clades: " + ", ".join([c.to_string() for c in p.tree.get_clades_at_height(1)]))
 
-    for i in range(iterations): # number of iterations as stop criteria
-        if i == 0 or i % 1000 == 0:
-            print ("----------------")
-            print ("Iteration n. " + str(i))
-            print ("Best lh: " + str(helper.best_likelihood))
-            print ("----------------")
+    # for i in range(iterations):
 
-        for j, p in enumerate(particles):
-            if i == 0 or i % 1000 == 0:
-                # p.tree.save("trees/tree_" + str(i) + "_" + str(j) + ".gv")
-                print ("Particle n. " + str(j))
-                print ("- loglh: " + str(p.best_likelihood))
-            operation = r.random()
-            op_result = particle_operation(helper, p, operation)
-            if op_result == 0:
-                p.best_likelihood = greedy_tree_loglikelihood(helper, p)
-            # updating swarm best
-            if (p.best_likelihood > helper.best_likelihood):
-                helper.best_likelihood = p.best_likelihood
-                helper.best_likelihood_particle = p
-            # elif (p.best_likelihood < helper.best_likelihood):
-            #     blp = helper.best_likelihood_particle
-            #     new_particle_tree = blp.tree.copy_all()
-            #     new_particle_best_sigma = copy.deepcopy(blp.best_sigma)
-            #     new_particle_losses_list = copy.deepcopy(blp.losses_list)
-            #     new_particle_k_losses_list = copy.deepcopy(blp.k_losses_list)
 
-            #     particles[j] = TreeHelper(new_particle_tree, blp.best_likelihood, new_particle_best_sigma, new_particle_losses_list, new_particle_k_losses_list, blp.velocity)
-        for j, p in enumerate(particles):
-            if (p.best_likelihood < helper.best_likelihood):
-                blp = helper.best_likelihood_particle
-                n_tree = blp.original.copy()
-                new_particle = TreeHelper.fromscratch(helper.cells, helper.mutations, n_tree)
-
-                Op.do_list(helper, new_particle, blp.operations[:-1])
-                new_particle.best_likelihood = greedy_tree_loglikelihood(helper, new_particle)
-
-                particles[j] = new_particle
 
 def particle_operation(helper, particle, operation):
     if operation < 0.25:
         # back-mutation
-
         back_res = add_back_mutation(helper, particle)
         if back_res == 0:
             particle.tree.fix_for_losses(helper, particle)
@@ -115,16 +81,16 @@ def _generate_random_btree(mutations, mutation_names):
     
     return root
 
-def add_back_mutation(helper, tree_helper):
+def add_back_mutation(helper, particle):
 
     max_losses = helper.k
-    cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
+    cached_content = particle.tree.get_cached_content(leaves_only=False)
     keys = list(cached_content.keys())
     node = r.choice(keys)
 
     if (node.up == None or node.up.up == None):
         return 1
-    if (len(tree_helper.losses_list) >= max_losses):
+    if (len(particle.losses_list) >= max_losses):
         return 1
     candidates = [p for p in node.iter_ancestors() if (p.loss == False)]
 
@@ -133,7 +99,7 @@ def add_back_mutation(helper, tree_helper):
     if (candidate.mutation_id == -1):
         return 1
     # Ensuring we have no more than k mutations per mutation type
-    if (tree_helper.k_losses_list[candidate.mutation_id] >= helper.k):
+    if (particle.k_losses_list[candidate.mutation_id] >= helper.k):
         return 1
     # If the mutation is already lost in the current tree, no way to remove it again
     if (node.is_mutation_already_lost(candidate.mutation_id)):
@@ -141,8 +107,8 @@ def add_back_mutation(helper, tree_helper):
     #
     node_deletion = Node(candidate.name, None, candidate.mutation_id, rid(), True)
 
-    tree_helper.losses_list.append(node_deletion)
-    tree_helper.k_losses_list[node_deletion.mutation_id] += 1
+    particle.losses_list.append(node_deletion)
+    particle.k_losses_list[node_deletion.mutation_id] += 1
 
     # saving parent before detaching
     par = node.up
@@ -150,22 +116,22 @@ def add_back_mutation(helper, tree_helper):
     par.add_child(node_deletion)
     node_deletion.add_child(current)
 
-    tree_helper.operations.append(Op(Op.BACK_MUTATION, node.uid, candidate.uid))
+    particle.operations.append(Op(Op.BACK_MUTATION, node.uid, candidate.uid))
     
     return 0
 
-def mutation_delete(helper, tree_helper):
-    if (len(tree_helper.losses_list) == 0):
+def mutation_delete(helper, particle):
+    if (len(particle.losses_list) == 0):
         return 1
 
-    node_delete = r.choice(tree_helper.losses_list)
-    node_delete.delete_b(helper, tree_helper)
+    node_delete = r.choice(particle.losses_list)
+    node_delete.delete_b(helper, particle)
 
-    tree_helper.operations.append(Op(Op.DELETE_MUTATION, node_delete.uid))
+    particle.operations.append(Op(Op.DELETE_MUTATION, node_delete.uid))
     return 0
 
-def switch_nodes(helper, tree_helper):
-    cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
+def switch_nodes(helper, particle):
+    cached_content = particle.tree.get_cached_content(leaves_only=False)
     keys = list(cached_content.keys())
 
     u = None
@@ -182,17 +148,17 @@ def switch_nodes(helper, tree_helper):
         return 1
 
     # appending before switch happens
-    tree_helper.operations.append(Op(Op.SWITCH_NODES, u.uid, v.uid))
+    particle.operations.append(Op(Op.SWITCH_NODES, u.uid, v.uid))
 
     u.swap(v)
 
-    u.fix_for_losses(helper, tree_helper)
-    v.fix_for_losses(helper, tree_helper)
+    u.fix_for_losses(helper, particle)
+    v.fix_for_losses(helper, particle)
 
     return 0
 
-def prune_regraft(helper, tree_helper):
-    cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
+def prune_regraft(helper, particle):
+    cached_content = particle.tree.get_cached_content(leaves_only=False)
     keys = list(cached_content.keys())
 
     prune_res = 0
@@ -211,12 +177,12 @@ def prune_regraft(helper, tree_helper):
         if prune_res == 0:
             pruned_node = u
     if pruned_node is not None:
-        tree_helper.operations.append(Op(Op.PRUNE_REGRAFT, pruned_node.uid, v.uid))
-        pruned_node.fix_for_losses(helper, tree_helper)
+        particle.operations.append(Op(Op.PRUNE_REGRAFT, pruned_node.uid, v.uid))
+        pruned_node.fix_for_losses(helper, particle)
         return 0
     return 1
 
-def prob(I, E, genotypes, helper, tree_helper):
+def prob(I, E, genotypes, helper, particle):
     p = 0
     if I == 0:
         if E == 0:
@@ -224,7 +190,6 @@ def prob(I, E, genotypes, helper, tree_helper):
         elif E == 1:
             p = helper.alpha
         else:
-            tree_helper.tree.save("trees/e_error.gv")
             raise SystemError("Unknown value for E: " + str(E))
     elif I == 1:
         if E == 0:
@@ -232,7 +197,6 @@ def prob(I, E, genotypes, helper, tree_helper):
         elif E == 1:
             p = 1 - helper.alpha
         else:
-            tree_helper.tree.save("trees/e_error.gv")
             raise SystemError("Unknown value for E: " + str(E))
     elif I == 2:
         p = 1
@@ -240,8 +204,11 @@ def prob(I, E, genotypes, helper, tree_helper):
         raise SystemError("Unknown value for I")
     return p
 
-def greedy_tree_loglikelihood(helper, tree_helper):
-    cached_content = tree_helper.tree.get_cached_content(leaves_only=False)
+def accept(iterations, currentIteration):
+    return r.random() < (iterations / currentIteration)
+
+def greedy_tree_loglikelihood(helper, particle):
+    cached_content = particle.tree.get_cached_content(leaves_only=False)
 
     node_count = len(cached_content)
     nodes_list = list(cached_content.keys())
@@ -268,13 +235,13 @@ def greedy_tree_loglikelihood(helper, tree_helper):
             if node_genotypes[n][0] != 3:
                 lh = 0
                 for j in range(helper.mutations):
-                    p = prob(helper.matrix[i][j], node_genotypes[n][j], node_genotypes, helper, tree_helper)
+                    p = prob(helper.matrix[i][j], node_genotypes[n][j], node_genotypes, helper, particle)
                     lh += math.log(p)
 
                 if lh > best_lh:
                     best_sigma = n
                     best_lh = lh
-        tree_helper.best_sigma[i] = best_sigma
+        particle.best_sigma[i] = best_sigma
         maximum_likelihood += best_lh
     
     return maximum_likelihood
