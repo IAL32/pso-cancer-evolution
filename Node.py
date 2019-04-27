@@ -157,19 +157,27 @@ class Node(Tree):
         node.name = tmp_name
         node.mutation_id = tmp_mutation_id
         node.loss = tmp_loss
-    
+
     def get_clades_at_height(self, height=1):
         " Returns a list of clades at the desired height "
         tmp = []
-        for leaf in self.iter_leaves():
-            for cl in leaf._get_parent_at_height(height):
-                if len(tmp) > 0:
-                    if cl not in tmp:
-                        # temporary adding clade, as it will be checked later anyways
+        # getting only leaves from cache, faster than iterating
+        # over them
+        cached_nodes = self.get_cached_content()
+
+        for n in cached_nodes:
+            if n.is_leaf():
+                for cl in n._get_parent_at_height(height):
+                    if len(tmp) > 0:
+                        if cl not in tmp:
+                            # temporary adding clade, as it will be checked later anyways
+                            tmp.append(cl)
+                    else:
                         tmp.append(cl)
-                else:
-                    tmp.append(cl)
         clades = []
+
+        # check that every candidate clade is not an ancestor of someone else,
+        # otherwise we could get an overlap of clades
 
         for cl in tmp:
             add = True

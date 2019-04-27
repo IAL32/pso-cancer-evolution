@@ -35,8 +35,6 @@ def pso(nparticles, iterations, helper, matrix):
 
     # for i in range(iterations):
 
-
-
 def particle_operation(helper, particle, operation):
     if operation < 0.25:
         # back-mutation
@@ -84,8 +82,9 @@ def _generate_random_btree(mutations, mutation_names):
 def add_back_mutation(helper, particle):
 
     max_losses = helper.k
-    cached_content = particle.tree.get_cached_content(leaves_only=False)
-    keys = list(cached_content.keys())
+    # gets a list of all the nodes from cache
+    cached_nodes = particle.tree.get_cached_content()
+    keys = list(cached_nodes.keys())
     node = r.choice(keys)
 
     if (node.up == None or node.up.up == None):
@@ -131,15 +130,15 @@ def mutation_delete(helper, particle):
     return 0
 
 def switch_nodes(helper, particle):
-    cached_content = particle.tree.get_cached_content(leaves_only=False)
-    keys = list(cached_content.keys())
+    cached_nodes = particle.tree.get_cached_content()
+    keys = list(cached_nodes.keys())
 
     u = None
     while (u == None or u.up == None or u.loss):
         u = r.choice(keys)
         keys.remove(u)
     v = None
-    keys = list(cached_content.keys())
+    keys = list(cached_nodes.keys())
     while (v == None or v.up == None or v.loss):
         v = r.choice(keys)
         keys.remove(v)
@@ -158,8 +157,8 @@ def switch_nodes(helper, particle):
     return 0
 
 def prune_regraft(helper, particle):
-    cached_content = particle.tree.get_cached_content(leaves_only=False)
-    keys = list(cached_content.keys())
+    cached_nodes = particle.tree.get_cached_content()
+    keys = list(cached_nodes.keys())
 
     prune_res = 0
     pruned_node = None
@@ -169,7 +168,7 @@ def prune_regraft(helper, particle):
             u = r.choice(keys)
             keys.remove(u)
         v = None
-        keys = list(cached_content.keys())
+        keys = list(cached_nodes.keys())
         while (v == None or v.up == None or v.loss):
             v = r.choice(keys)
             keys.remove(v)
@@ -208,10 +207,10 @@ def accept(iterations, currentIteration):
     return r.random() < (iterations / currentIteration)
 
 def greedy_tree_loglikelihood(helper, particle):
-    cached_content = particle.tree.get_cached_content(leaves_only=False)
+    cached_nodes = particle.tree.get_cached_content()
 
-    node_count = len(cached_content)
-    nodes_list = list(cached_content.keys())
+    node_count = len(cached_nodes)
+    nodes_list = list(cached_nodes.keys())
     node_genotypes = [
         [0 for j in range(helper.mutations)]
         for i in range(node_count)
