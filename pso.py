@@ -9,8 +9,8 @@ from Operation import Operation as Op
 from Helper import Helper
 r.seed(1)
 
-def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, inertia, vmax):
-    helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, inertia, vmax)
+def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
+    helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k)
 
     pso(nparticles, iterations, helper, matrix)
 
@@ -19,10 +19,11 @@ def pso(nparticles, iterations, helper, matrix):
 
     # initialization
     particles = [
-        Particle.fromscratch(helper.cells, helper.mutations, _generate_random_btree(helper.mutations, helper.mutation_names))
+        Particle.random(helper)
         for n in range(nparticles)
     ]
 
+    print("Particle initialization...")
     for j, p in enumerate(particles):
         p.tree.save("trees/tree_" + str(j) + ".gv")
         p.best_likelihood = greedy_tree_loglikelihood(helper, p)
@@ -31,7 +32,44 @@ def pso(nparticles, iterations, helper, matrix):
             helper.best_likelihood_particle = p
         print ("Particle n. " + str(j))
         print ("- loglh: " + str(p.best_likelihood))
-        print("clades: " + ", ".join([c.to_string() for c in p.tree.get_clades_at_height(1)]))
+    
+    for i in range(iterations):
+        for j, p in enumerate(particles):
+            op = r.random()
+            tmp_particle = p.copy()
+            result = particle_operation(helper, tmp_particle, op)
+            # successful operation
+            if result == 0:
+                lh = greedy_tree_loglikelihood(helper, tmp_particle)
+
+                # updating particle best
+                if lh > p.best_likelihood:
+                    p.best_likelihood = lh
+                    p.best_tree = tmp_particle.tree
+                    p.losses_list = tmp_particle.losses_list
+                    p.k_losses_list = tmp_particle.k_losses_list
+
+                    # updating swarm best
+                    if lh > helper.best_likelihood:
+                        helper.best_likelihood = lh
+                        helper.best_likelihood_particle = tmp_particle
+
+                particles[j] = Particle.random(helper)
+
+                if accept(i, iterations): # going for the global's best
+                    # I take the clades up until a maximum height
+                    # depending on the current iteration ratio.
+                    # We get to higher clades as the time goes on
+                    height = math.ceil(tmp_particle.tree.get_height() * (i / iterations))
+                    clades = tmp_particle.tree.get_clades_at_height(height)
+                else: # going for the global's
+                    height = math.ceil(helper.best_likelihood_particle.tree.get_height() * (i / iterations))
+                    clades = helper.best_likelihood_particle.tree.get_clades_at_height(height)
+
+                # now that we have chosen wether to go for the
+                # particle's best or global best, we update the particle's
+                # tree regardless
+                reattach_clades(helper, particles[j], clades)
 
     # for i in range(iterations):
 
@@ -52,32 +90,6 @@ def particle_operation(helper, particle, operation):
     else:
         # prune-regraft two random nodes
         return prune_regraft(helper, particle)
-
-def _generate_random_btree(mutations, mutation_names):
-    """ Generates a random binary tree """
-    root = Node("germline", None, -1, 0)
-    
-    rantree = [i for i in range(mutations)]
-
-    r.shuffle(rantree, r.random)
-
-    nodes = [root]
-    append_node = 0
-    i = 0
-    while i < mutations:
-        nodes.append(
-            Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
-        )
-        i += 1
-
-        if i < mutations:
-            nodes.append(
-                Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
-            )
-        append_node += 1
-        i += 1
-    
-    return root
 
 def add_back_mutation(helper, particle):
 
@@ -114,8 +126,6 @@ def add_back_mutation(helper, particle):
     current = node.detach()
     par.add_child(node_deletion)
     node_deletion.add_child(current)
-
-    particle.operations.append(Op(Op.BACK_MUTATION, node.uid, candidate.uid))
     
     return 0
 
@@ -125,8 +135,6 @@ def mutation_delete(helper, particle):
 
     node_delete = r.choice(particle.losses_list)
     node_delete.delete_b(helper, particle)
-
-    particle.operations.append(Op(Op.DELETE_MUTATION, node_delete.uid))
     return 0
 
 def switch_nodes(helper, particle):
@@ -145,9 +153,6 @@ def switch_nodes(helper, particle):
 
     if u.uid == v.uid:
         return 1
-
-    # appending before switch happens
-    particle.operations.append(Op(Op.SWITCH_NODES, u.uid, v.uid))
 
     u.swap(v)
 
@@ -176,7 +181,6 @@ def prune_regraft(helper, particle):
         if prune_res == 0:
             pruned_node = u
     if pruned_node is not None:
-        particle.operations.append(Op(Op.PRUNE_REGRAFT, pruned_node.uid, v.uid))
         pruned_node.fix_for_losses(helper, particle)
         return 0
     return 1
@@ -203,8 +207,8 @@ def prob(I, E, genotypes, helper, particle):
         raise SystemError("Unknown value for I")
     return p
 
-def accept(iterations, currentIteration):
-    return r.random() < (iterations / currentIteration)
+def accept(currentIteration, iterations):
+    return r.random() < (currentIteration / iterations)
 
 def greedy_tree_loglikelihood(helper, particle):
     cached_nodes = particle.tree.get_cached_content()
@@ -244,3 +248,30 @@ def greedy_tree_loglikelihood(helper, particle):
         maximum_likelihood += best_lh
     
     return maximum_likelihood
+
+def reattach_clades(helper, particle, clades):
+
+    for cl in clades:
+        clade_nodes = cl.get_cached_content()
+        # remove every node already in clades
+        for cn in clade_nodes:
+            to_delete = next(particle.tree.iter_search_nodes(name=cn.name), None)
+            if to_delete is not None:
+                to_delete.delete()
+
+    leaves = particle.tree.get_leaves()
+    candidate_leaves = leaves.copy()
+
+    # less leaves that i can re-attach to
+    if len(candidate_leaves) < len(clades):
+        # select more random leaves to attach, reusing them
+        candidate_leaves.append(r.choices(leaves, k = len(clades) - len(candidate_leaves)))
+    
+    for leaf in candidate_leaves:
+        for cl in clades:
+            leaf.add_child(cl)
+
+    losses_list, k_losses_list = particle.calculate_losses_list(helper)
+    particle.losses_list = losses_list
+    particle.k_losses_list = k_losses_list
+    particle.tree.fix_for_losses(helper, particle)

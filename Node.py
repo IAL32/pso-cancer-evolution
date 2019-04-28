@@ -60,8 +60,8 @@ class Node(Tree):
         # TODO: workout how can sigma be done
         # for i in range(helper.cells):
 
-    def find_node_by_uid(self, uid):
-        return next(self.iter_search_nodes(uid = uid))
+    def find_node_by_uid(self, uid_):
+        return next(self.iter_search_nodes(uid=uid_), None)
 
     def copy_all(self):
         cached_content = self.get_cached_content(leaves_only=False)
@@ -138,6 +138,13 @@ class Node(Tree):
         node_reattach.add_child(self)
         return 0
     
+    def get_height(self):
+        "Returns the tree height from the current node"
+        
+        height = 0
+        for child in self.children:
+            height = max(height, child.get_height())
+        return height + 1
     def copy_from(self, node):
         self.uid = node.uid
         self.name = node.name
