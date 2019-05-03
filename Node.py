@@ -39,17 +39,15 @@ class Node(Tree):
 
     def fix_for_losses(self, helper, tree):
 
-        if not self.is_leaf():
-            self.children[0].fix_for_losses(helper, tree)
-        next_sibling = self.next_sibling()
-        if next_sibling:
-            next_sibling.fix_for_losses(helper, tree)
+        for n in self.traverse():
+            if n.uid != self.uid:
+                n.fix_for_losses(helper, tree)
 
         if self.loss:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
-            if not valid or lost:
+            if (not valid) or lost:
                 self.delete_b(helper, tree)
     
     def delete_b(self, helper, tree):
@@ -120,14 +118,19 @@ class Node(Tree):
 
     def is_ancestor_of(self, node):
         """ Checks if current node is parent of the given arguent node """
-        return (self in node.iter_ancestors())
+        par = self.up
+        while par != None:
+            if par.uid == node.uid:
+                return True
+            par = par.up
+        return False
 
     def prune_and_reattach(self, node_reattach):
         """ Detaches current node (with all its descendants) and reattaches it into another node """
 
         if node_reattach.is_ancestor_of(self):
             return 1
-        if node_reattach.up == self:
+        if node_reattach.up.uid == self.uid:
             return 1
         if self.up is None:
             return 1
@@ -151,8 +154,10 @@ class Node(Tree):
         self.mutation_id = node.mutation_id
         self.loss = node.loss
 
-    def swap(self, node):
+    def swap(self, node, tree):
         """ Switch this data with with that of another node """
+        if self.loss:
+            tree.losses_list.remove(self)
         tmp_uid = self.uid
         tmp_name = self.name
         tmp_mutation_id  = self.mutation_id
@@ -164,6 +169,9 @@ class Node(Tree):
         node.name = tmp_name
         node.mutation_id = tmp_mutation_id
         node.loss = tmp_loss
+
+        if node.loss:
+            tree.losses_list.append(node)
 
     def get_clades_at_height(self, height=1):
         " Returns a list of clades at the desired height "
