@@ -7,5 +7,4 @@ class Helper(object):
         self.alpha = alpha
         self.beta = beta
         self.k = k
-        self.best_likelihood = float("-inf")
-        self.best_likelihood_particle = None
+        self.best_particle = None

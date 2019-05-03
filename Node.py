@@ -37,24 +37,24 @@ class Node(Tree):
     mutation_id = property(fget=_get_mutation_id, fset=_set_mutation_id)
     loss = property(fget=_get_loss, fset=_set_loss)
 
-    def fix_for_losses(self, helper, particle):
+    def fix_for_losses(self, helper, tree):
 
         if not self.is_leaf():
-            self.children[0].fix_for_losses(helper, particle)
+            self.children[0].fix_for_losses(helper, tree)
         next_sibling = self.next_sibling()
         if next_sibling:
-            next_sibling.fix_for_losses(helper, particle)
+            next_sibling.fix_for_losses(helper, tree)
 
         if self.loss:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
             if not valid or lost:
-                self.delete_b(helper, particle)
+                self.delete_b(helper, tree)
     
-    def delete_b(self, helper, particle):
-        particle.losses_list.remove(self)
-        particle.k_losses_list[self.mutation_id] -= 1
+    def delete_b(self, helper, tree):
+        tree.losses_list.remove(self)
+        tree.k_losses_list[self.mutation_id] -= 1
         self.delete()
 
         # TODO: workout how can sigma be done
