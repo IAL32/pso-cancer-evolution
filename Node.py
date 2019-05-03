@@ -38,12 +38,11 @@ class Node(Tree):
     loss = property(fget=_get_loss, fset=_set_loss)
 
     def fix_for_losses(self, helper, tree):
+        children = [c for c in self.children]
+        for n in children:
+            n.fix_for_losses(helper, tree)
 
-        for n in self.traverse():
-            if n.uid != self.uid:
-                n.fix_for_losses(helper, tree)
-
-        if self.loss:
+        if self in tree.losses_list:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
@@ -53,7 +52,7 @@ class Node(Tree):
     def delete_b(self, helper, tree):
         tree.losses_list.remove(self)
         tree.k_losses_list[self.mutation_id] -= 1
-        self.delete()
+        self.delete(prevent_nondicotomic=False)
 
         # TODO: workout how can sigma be done
         # for i in range(helper.cells):
@@ -148,30 +147,19 @@ class Node(Tree):
         for child in self.children:
             height = max(height, child.get_height())
         return height + 1
+
     def copy_from(self, node):
         self.uid = node.uid
         self.name = node.name
         self.mutation_id = node.mutation_id
         self.loss = node.loss
 
-    def swap(self, node, tree):
+    def swap(self, node):
         """ Switch this data with with that of another node """
-        if self.loss:
-            tree.losses_list.remove(self)
-        tmp_uid = self.uid
-        tmp_name = self.name
-        tmp_mutation_id  = self.mutation_id
-        tmp_loss = self.loss
-
+        tmp_node = Node(self.name, None, self.mutation_id, self.uid, self.loss)
         self.copy_from(node)
+        node.copy_from(tmp_node)
 
-        node.uid = tmp_uid
-        node.name = tmp_name
-        node.mutation_id = tmp_mutation_id
-        node.loss = tmp_loss
-
-        if node.loss:
-            tree.losses_list.append(node)
 
     def get_clades_at_height(self, height=1):
         " Returns a list of clades at the desired height "

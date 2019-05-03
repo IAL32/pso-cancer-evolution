@@ -1,4 +1,5 @@
 from Node import Node, rid
+from Operation import Operation as Op
 import random as r
 import copy
 r.seed(1)
@@ -13,6 +14,8 @@ class Tree(object):
         self.best_sigma = [0] * cells
         self.likelihood = float("-inf")
         self.phylogeny = None
+        self.operation = None
+        self.debug = False
 
     def calculate_losses_list(self, mutations, k):
         losses_list = []
@@ -35,7 +38,11 @@ class Tree(object):
         for n in t.phylogeny.traverse():
             if n.loss:
                 t.losses_list.append(n)
-        t.k_losses_list = [l for l in self.k_losses_list]
+                t.k_losses_list[n.mutation_id] += 1
+        if self.operation == None:
+            t.operation = None
+        else:
+            t.operation = Op(self.operation.type, self.operation.node_name_1, self.operation.node_name_2, self.operation.node_name_3)
         return t
 
     @classmethod
@@ -44,11 +51,15 @@ class Tree(object):
         random_tree = cls._generate_random_btree(mutations, mutation_names)
         t.phylogeny = random_tree
         return t
+    
+    @classmethod
+    def germline_node(cls):
+        return Node("germline", None, -1, 0)
 
     @classmethod
     def _generate_random_btree(cls, mutations, mutation_names):
         """ Generates a random binary tree """
-        root = Node("germline", None, -1, 0)
+        root = cls.germline_node()
 
         rantree = [i for i in range(mutations)]
 

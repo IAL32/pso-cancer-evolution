@@ -6,6 +6,7 @@ import copy
 # from multiprocessing import Pool as ThreadPool
 from Particle import Particle
 from Operation import Operation as Op
+from Tree import Tree
 from Helper import Helper
 r.seed(1)
 
@@ -23,9 +24,9 @@ def pso(nparticles, iterations, helper, matrix):
     helper.best_particle = particles[0]
 
     for i, p in enumerate(particles):
-        p.last_tree.phylogeny.save("trees/tree_" + str(i) + ".gv")
-        lh = greedy_tree_loglikelihood(helper, p.last_tree)
-        p.last_tree.likelihood = lh
+        p.last_tree().phylogeny.save("trees/tree_" + str(i) + ".gv")
+        lh = greedy_tree_loglikelihood(helper, p.last_tree())
+        p.last_tree().likelihood = lh
         if (lh > helper.best_particle.best.likelihood):
             helper.best = p
         print ("Particle n. %d" % i)
@@ -34,46 +35,69 @@ def pso(nparticles, iterations, helper, matrix):
     for it in range(iterations):
         print("------- Iteration %d -------" % it)
         for i, p in enumerate(particles):
-            print ("Particle n. %d" % i)
-            print ("- loglh: %d" % p.best.likelihood)
-            op = r.random()
-            tree_copy = p.last_tree.copy()
-            result = tree_operation(helper, tree_copy, op)
-            # successful operation
+            # print ("Particle n. %d" % i)
+            # print ("- loglh: %d" % p.best.likelihood)
+            ops = list(range(0, Op.NUMBER))
+            result = -1
+
+            # keep trying an operation until we find a valid one
+            while len(ops) > 0 and result != 0:
+                # choose a random operation
+                op = ops.pop(r.randint(0, len(ops) - 1))
+                if accept(it, iterations):
+                    if r.random() < .5:
+                        tree_copy = helper.best_particle.best.copy()
+                    else:
+                        tree_copy = p.best.copy()
+                else:
+                    tree_copy = p.last_tree().copy()
+                if it == 107 and i == 6:
+                    print("Operation: %d, particle: %d" % (op, i))
+                    tree_copy.debug = True
+                result = tree_operation(helper, tree_copy, op)
+
+            # something has happened
+            if result == -1:
+                raise SystemError("An error has occurred while chosing an operation for particle %d at %d iteration" % (i, it))
+
+            # updating log likelihood and bests
             if result == 0:
-                print("- successful %d operation" % ((op * 10) % 4))
-                p.trees.append(tree_copy)
-                lh = greedy_tree_loglikelihood(helper, tree_copy)
-                tree_copy.likelihood = lh
+                if r.random() < .5:
+                    p.operations[op] += 1
+                    # print("Operation %d" % (tree_copy.operation.type))
+                    lh = greedy_tree_loglikelihood(helper, tree_copy)
+                    tree_copy.likelihood = lh
+                    p.trees.append(tree_copy)
 
-                # updating particle best
-                if lh > p.best.likelihood:
-                    p.best = p.last_tree
-                    print("- !! Found new particle best")
-                    # updating swarm best
+                    if lh > p.best.likelihood:
+                        # updating particle best
+                        print("- !! Found new particle best, previous: %d, now: %d" % (p.best.likelihood, lh))
+                        p.best = tree_copy
                     if lh > helper.best_particle.best.likelihood:
+                        # updating swarm best
+                        print("- !!!!! Found new swarm best, previous: %d, now: %d" % (helper.best_particle.best.likelihood, lh))
                         helper.best_particle = p
-                        print("- !!!!! Found new swarm best")
 
- 
+    for i, p in enumerate(particles):
+        print ("Particle n. %d" % i)
+        print ("- loglh: %d" % p.best.likelihood)
+        p.best.phylogeny.save("trees/tree_last_" + str(i) + ".gv")
 
 def tree_operation(helper, tree, operation):
-    if operation < 0.25:
+    if operation == Op.BACK_MUTATION:
         # back-mutation
-        back_res = add_back_mutation(helper, tree)
-        if back_res == 0:
-            tree.phylogeny.fix_for_losses(helper, tree)
-            return 0
-        return 1
-    elif operation < 0.50:
+        return add_back_mutation(helper, tree)
+    elif operation == Op.DELETE_MUTATION:
         # delete random mutation
         return mutation_delete(helper, tree)
-    elif operation < 0.75:
+    elif operation == Op.SWITCH_NODES:
         # switch random nodes
         return switch_nodes(helper, tree)
-    else:
+    elif operation == Op.PRUNE_REGRAFT:
         # prune-regraft two random nodes
         return prune_regraft(helper, tree)
+    else:
+        raise SystemError("Something has happened while chosing an operation")
 
 def add_back_mutation(helper, tree):
 
@@ -117,15 +141,23 @@ def add_back_mutation(helper, tree):
     current = node.detach()
     par.add_child(node_deletion)
     node_deletion.add_child(current)
-    
+    current.fix_for_losses(helper, tree)
+    tree.operation = Op(Op.BACK_MUTATION, node_name_1=candidate.name, node_name_2=node_deletion.name)
     return 0
 
 def mutation_delete(helper, tree):
     if (len(tree.losses_list) == 0):
         return 1
-
+    
+    if tree.debug:
+        tree.phylogeny.save("trees/test.gv")
+        print(tree.losses_list, tree.k_losses_list)
     node_delete = r.choice(tree.losses_list)
+    tree.operation = Op(Op.DELETE_MUTATION, node_name_1=node_delete.name)
     node_delete.delete_b(helper, tree)
+    if tree.debug:
+        tree.phylogeny.save("trees/test2.gv")
+        print(node_delete.name, tree.losses_list, tree.k_losses_list)
     return 0
 
 def switch_nodes(helper, tree):
@@ -138,27 +170,23 @@ def switch_nodes(helper, tree):
         keys.remove(u)
     v = None
     keys = list(cached_nodes.keys())
-    while (v == None or v.up == None or v.loss):
+    while (v == None or v.up == None or v.loss or u.name == v.name):
         v = r.choice(keys)
         keys.remove(v)
 
-    if u.uid == v.uid:
-        return 1
+    tree.operation = Op(Op.SWITCH_NODES, node_name_1=u.name, node_name_2=v.name)
 
     u.swap(v)
-
     u.fix_for_losses(helper, tree)
     v.fix_for_losses(helper, tree)
-
     return 0
 
 def prune_regraft(helper, tree):
     cached_nodes = tree.phylogeny.get_cached_content()
-    keys = list(cached_nodes.keys())
 
-    prune_res = 0
-    pruned_node = None
+    prune_res = -1
     while prune_res != 0:
+        keys = list(cached_nodes.keys())
         u = None
         while (u == None or u.up == None or u.loss):
             u = r.choice(keys)
@@ -169,12 +197,11 @@ def prune_regraft(helper, tree):
             v = r.choice(keys)
             keys.remove(v)
         prune_res = u.prune_and_reattach(v)
-        if prune_res == 0:
-            pruned_node = u
-    if pruned_node is not None:
-        pruned_node.fix_for_losses(helper, tree)
-        return 0
-    return 1
+
+    tree.operation = Op(Op.PRUNE_REGRAFT, node_name_1=u.name, node_name_2=v.name)
+    u.fix_for_losses(helper, tree)
+
+    return 0
 
 def prob(I, E, genotypes, helper, particle):
     p = 0
@@ -203,7 +230,7 @@ def accept(currentIteration, iterations):
 
 def greedy_tree_loglikelihood(helper, tree):
     "Gets maximum likelihood of a tree"
-    nodes_list = [n for n in tree.phylogeny.traverse()]
+    nodes_list = tree.phylogeny.get_cached_content()
     node_genotypes = [
         [0 for j in range(helper.mutations)]
         for i in range(len(nodes_list))
