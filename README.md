@@ -66,3 +66,6 @@ Here's a list of examples that you can try:
 (env) $ python main.py --infile "data/easy/3.txt" --mutations 8 --iterations 10 --mutfile "data/easy/3_mut.txt"
 ```
 
+```shell
+(env) $ python main.py --infile "data/scg_gawad/pat1.txt" --mutations 20 --mutfile "data/scg_gawad/pat1_mut.txt" --particles 10 --iterations 500
+```

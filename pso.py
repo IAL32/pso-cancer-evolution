@@ -9,7 +9,7 @@ from Operation import Operation as Op
 from Tree import Tree
 from Helper import Helper
 import sys
-r.seed(1)
+# r.seed(1)
 
 def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
     helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k)

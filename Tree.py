@@ -2,7 +2,7 @@ from Node import Node, rid
 from Operation import Operation as Op
 import random as r
 import copy
-r.seed(1)
+# r.seed(1)
 
 class Tree(object):
 
