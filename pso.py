@@ -8,6 +8,7 @@ from Particle import Particle
 from Operation import Operation as Op
 from Tree import Tree
 from Helper import Helper
+import sys
 r.seed(1)
 
 def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
@@ -50,7 +51,15 @@ def pso(nparticles, iterations, helper, matrix):
                     else:
                         tree_copy = p.best.copy()
                 else:
-                    tree_copy = p.last_tree().copy()
+                    minimum_distance_particle = p
+                    minimum_distance = sys.maxsize
+                    for j, p2 in enumerate(particles):
+                        if i != j:
+                            distance = p2.last_tree().phylogeny.robinson_foulds(p2.last_tree().phylogeny)
+                            if distance[0] < minimum_distance:
+                                minimum_distance_particle = p2
+                                minimum_distance = distance[0]
+                    tree_copy = minimum_distance_particle.last_tree().copy()
                 if it == 107 and i == 6:
                     print("Operation: %d, particle: %d" % (op, i))
                     tree_copy.debug = True
