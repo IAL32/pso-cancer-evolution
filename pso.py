@@ -45,29 +45,20 @@ def pso(nparticles, iterations, helper, matrix):
             while len(ops) > 0 and result != 0:
                 # choose a random operation
                 op = ops.pop(r.randint(0, len(ops) - 1))
-                if accept(it, iterations):
-                    if r.random() < .5:
-                        tree_copy = helper.best_particle.best.copy()
-                    else:
-                        tree_copy = p.best.copy()
+                d_s, (_, highest_s) = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.copy().phylogeny)
+                d_p, (_, highest_p) = p.last_tree().phylogeny.distance(helper, p.best.copy().phylogeny)
+                ran = r.random()
+                if ran < .25:
+                    tree_copy = helper.best_particle.best.copy()
+                elif ran < .50:
+                    tree_copy = p.best.copy()
+                elif ran < .75:
+                    clade_to_attach = highest_s if d_s > d_p else highest_p
+                    tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+                    tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, clade_to_attach)
                 else:
-                    minimum_distance_particle = p
-                    minimum_distance = sys.maxsize
-                    for j, p2 in enumerate(particles):
-                        if i != j:
-                            distance = p2.last_tree().phylogeny.robinson_foulds(p2.last_tree().phylogeny)
-                            if distance[0] < minimum_distance:
-                                minimum_distance_particle = p2
-                                minimum_distance = distance[0]
-                    tree_copy = minimum_distance_particle.last_tree().copy()
-                if it == 107 and i == 6:
-                    print("Operation: %d, particle: %d" % (op, i))
-                    tree_copy.debug = True
+                    tree_copy = p.last_tree().copy()
                 result = tree_operation(helper, tree_copy, op)
-
-            # something has happened
-            if result == -1:
-                raise SystemError("An error has occurred while chosing an operation for particle %d at %d iteration" % (i, it))
 
             # updating log likelihood and bests
             if result == 0:
@@ -262,7 +253,7 @@ def greedy_tree_loglikelihood(helper, tree):
         best_sigma = -1
         best_lh = float("-inf")
 
-        for n, node in enumerate(nodes_list):
+        for n, _ in enumerate(nodes_list):
             if node_genotypes[n][0] != 3:
                 lh = 0
                 for j in range(helper.mutations):

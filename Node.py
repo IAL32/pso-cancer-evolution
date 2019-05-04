@@ -2,6 +2,9 @@ from ete3 import Tree
 import random
 import string
 from graphviz import Source
+import networkx as nx
+import matplotlib.pyplot as plt
+# random.seed(1)
 
 def rid(k=6):
     return ''.join(random.choices(string.digits + 'abcdef', k=k))
@@ -91,30 +94,6 @@ class Node(Tree):
         
         return False
 
-    def previous_sibling(self):
-        " Returns the previous sibling, if it exists "
-        if self.up is None:
-            return None
-        if len(self.up.children) == 1:
-            return None
-        self_position = self.up.children.index(self)
-        if self_position - 1 == -1:
-            return None
-        sibling_position = self_position - 1
-        return self.up.children[sibling_position]
-
-    def next_sibling(self):
-        " Returns the next sibling, if it exists "
-        if self.up is None:
-            return None
-        if len(self.up.children) == 1: # single node
-            return None
-        self_position = self.up.children.index(self)
-        if self_position + 1 == len(self.up.children):
-            return None
-        sibling_position = self_position + 1
-        return self.up.children[sibling_position]
-
     def is_ancestor_of(self, node):
         """ Checks if current node is parent of the given arguent node """
         par = self.up
@@ -159,7 +138,6 @@ class Node(Tree):
         tmp_node = Node(self.name, None, self.mutation_id, self.uid, self.loss)
         self.copy_from(node)
         node.copy_from(tmp_node)
-
 
     def get_clades_at_height(self, height=1):
         " Returns a list of clades at the desired height "
@@ -208,6 +186,15 @@ class Node(Tree):
             climb += 1
             par = par.up
 
+    def get_clades(self):
+        nodes_list = list(self.get_cached_content().keys())
+
+        for n in nodes_list:
+            if n.up is None or n.is_leaf():
+                nodes_list.remove(n)
+                continue
+        return nodes_list
+
     def _to_dot_label(self, d={}):
         if not len(d):
             return ''
@@ -238,6 +225,9 @@ class Node(Tree):
             props = {"label": n.name + "\nuid: " + n.uid}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
+                for p in n.iter_ancestors():
+                    if n.mutation_id == p.mutation_id and p.loss:
+                        out += self._to_dot_node(n.uid, p.uid)
             out += self._to_dot_node(n.uid, props=props)
             out += self._to_dot_node(self.uid, n.uid)
             if not n.is_leaf():
@@ -257,6 +247,78 @@ class Node(Tree):
             genotypes[self.mutation_id] -= 1
 
         self.up.get_genotype_profile(genotypes)
+
+    def distance(self, helper, tree):
+        "Calculates the distance between this tree and another"
+        clades_t1 = self.get_clades()
+        clades_t2 = tree.get_clades()
+
+        G = nx.Graph()
+        G.add_nodes_from(clades_t1, bipartite=0)
+        G.add_nodes_from(clades_t2, bipartite=1)
+        edges = []
+        weights = []
+
+        for cl1 in clades_t1:
+            for cl2 in clades_t2:
+                # w(e) = n. mutazioni comuni ai clade
+                w = Node.common_clades_mutation(helper, cl1, cl2)
+                edges.append((cl1, cl2))
+                weights.append(w)
+                G.add_edge(cl1, cl2, weight=w)
+
+        # matching di peso massimo
+        max_matching = list(nx.algorithms.matching.max_weight_matching(G))
+        # highly inconvenient, would have preferred the graph with the weights attached,
+        # or to be able to choose if I want a Graph, a list of tuples or whatever
+        max_weight = None
+        max_weight_edge = None
+        for (kk, vv) in max_matching:
+            i = 0
+            for (k, v) in edges:
+                if kk.name == k.name and vv.name == v.name or kk.name == v.name and vv.name == k.name:
+                    break
+                i += 1
+
+            if max_weight is None or max_weight < weights[i]:
+                max_weight = weights[i]
+                max_weight_edge = edges[i]
+        # print("Mutations: %d, max_weight: %d" % (helper.mutations, max_weight))
+        return (helper.mutations - max_weight), max_weight_edge
+
+    def attach_clade_and_fix(self, helper, tree, clade):
+        # remove every node already in clade
+        nodes_list = list(self.get_cached_content().keys())
+        clade_nodes_list = list(clade.get_cached_content().keys())
+        for n in nodes_list:
+            for cln in clade_nodes_list:
+                if n.name == cln.name:
+                    n.delete()
+                    clade_nodes_list.remove(cln)
+                    break
+        self.add_child(clade)
+        losses_list, k_losses_list = tree.calculate_losses_list(helper.k)
+        tree.losses_list = losses_list
+        tree.k_losses_list = k_losses_list
+        self.fix_for_losses(helper, tree)
+
+    @classmethod
+    def common_clades_mutation(cls, helper, clade1, clade2):
+        clade1_mutations = [False] * helper.mutations
+        clade2_mutations = [False] * helper.mutations
+        common = 0
+        # ignoring back mutations
+        for n in clade1:
+            if not n.loss:
+                clade1_mutations[n.mutation_id] = True
+        for n in clade2:
+            if not n.loss:
+                clade2_mutations[n.mutation_id] = True
+        
+        for m in range(helper.mutations):
+            if clade1_mutations[m] and clade2_mutations[m]:
+                common += 1
+        return common
 
     def to_string(self):
         return "[uid: " + str(self.uid) + "; dist: " + str(self.get_distance(self.get_tree_root())) + "]"

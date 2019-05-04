@@ -17,9 +17,9 @@ class Tree(object):
         self.operation = None
         self.debug = False
 
-    def calculate_losses_list(self, mutations, k):
+    def calculate_losses_list(self, k):
         losses_list = []
-        k_losses_list = [0] * mutations
+        k_losses_list = [0] * self.mutations
         for n in self.phylogeny.traverse():
             if n.loss:
                 losses_list.append(n)
