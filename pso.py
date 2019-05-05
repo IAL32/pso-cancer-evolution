@@ -1,14 +1,17 @@
-from Node import Node, rid
-from graphviz import Source
-import random as r
-import math
 import copy
+import math
+import random as r
+import sys
+
+from graphviz import Source
+
+from Helper import Helper
+from Node import Node, rid
+from Operation import Operation as Op
 # from multiprocessing import Pool as ThreadPool
 from Particle import Particle
-from Operation import Operation as Op
 from Tree import Tree
-from Helper import Helper
-import sys
+
 # r.seed(1)
 
 def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
@@ -25,13 +28,13 @@ def pso(nparticles, iterations, helper, matrix):
     helper.best_particle = particles[0]
 
     for i, p in enumerate(particles):
-        p.last_tree().phylogeny.save("trees/tree_" + str(i) + ".gv")
+        # p.last_tree().phylogeny.save("trees/tree_" + str(i) + ".gv")
         lh = greedy_tree_loglikelihood(helper, p.last_tree())
         p.last_tree().likelihood = lh
         if (lh > helper.best_particle.best.likelihood):
             helper.best = p
-        print ("Particle n. %d" % i)
-        print ("- loglh: %d" % lh)
+        # print ("Particle n. %d" % i)
+        # print ("- loglh: %d" % lh)
 
     for it in range(iterations):
         print("------- Iteration %d -------" % it)
@@ -54,6 +57,10 @@ def pso(nparticles, iterations, helper, matrix):
                     tree_copy = p.best.copy()
                 elif ran < .75:
                     clade_to_attach = highest_s if d_s > d_p else highest_p
+                    # reducing the clade height to increase variety
+                    if len(clade_to_attach.children) > 0:
+                        clade_to_attach = clade_to_attach.get_random_node()
+
                     tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
                     tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, clade_to_attach)
                 else:
@@ -62,21 +69,22 @@ def pso(nparticles, iterations, helper, matrix):
 
             # updating log likelihood and bests
             if result == 0:
-                if r.random() < .5:
-                    p.operations[op] += 1
-                    # print("Operation %d" % (tree_copy.operation.type))
-                    lh = greedy_tree_loglikelihood(helper, tree_copy)
-                    tree_copy.likelihood = lh
-                    p.trees.append(tree_copy)
+                p.operations[op] += 1
+                # print("Operation %d" % (tree_copy.operation.type))
+                lh = greedy_tree_loglikelihood(helper, tree_copy)
+                tree_copy.likelihood = lh
+                p.trees.append(tree_copy)
 
-                    if lh > p.best.likelihood:
-                        # updating particle best
-                        print("- !! Found new particle best, previous: %d, now: %d" % (p.best.likelihood, lh))
-                        p.best = tree_copy
-                    if lh > helper.best_particle.best.likelihood:
-                        # updating swarm best
-                        print("- !!!!! Found new swarm best, previous: %d, now: %d" % (helper.best_particle.best.likelihood, lh))
-                        helper.best_particle = p
+                if lh > p.best.likelihood:
+                    # updating particle best
+                    decreased = (lh - p.best.likelihood) / p.best.likelihood * 100
+                    print("- !! Found new particle best, previous: %d, now: %d, decreased by %f%%" % (p.best.likelihood, lh, decreased))
+                    p.best = tree_copy
+                if lh > helper.best_particle.best.likelihood:
+                    # updating swarm best
+                    decreased = (lh - helper.best_particle.best.likelihood) / helper.best_particle.best.likelihood * 100
+                    print("- !!!!! Found new swarm best, previous: %d, now: %d, decreased by %f%%" % (helper.best_particle.best.likelihood, lh, decreased))
+                    helper.best_particle = p
 
     for i, p in enumerate(particles):
         print ("Particle n. %d" % i)

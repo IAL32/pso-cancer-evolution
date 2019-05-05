@@ -19,11 +19,14 @@ Options:
     -k=<k>                                  K value of Dollo(k) model used as phylogeny tree [default: 3].
 """
 
-from docopt import docopt
-import numpy as np
 import io
 import sys
+
+import numpy as np
+from docopt import docopt
+
 import pso
+
 
 def main(argv):
     arguments = docopt(__doc__, version="PSO-Cancer-Evolution 1.0")
@@ -43,7 +46,7 @@ def main(argv):
                 if len(mutation_names) != mutations:
                     raise Exception("Mutation names number file does not match command parameter!", len(mutation_names), mutations)
         else:
-            mutation_names = list(range(1, mutations))
+            mutation_names = list(range(0, mutations))
 
         # reading the file and feeding it to numpy
         # assuring that we at least have 2D array to work with

@@ -1,9 +1,11 @@
-from ete3 import Tree
 import random
 import string
-from graphviz import Source
-import networkx as nx
+
 import matplotlib.pyplot as plt
+import networkx as nx
+from ete3 import Tree
+from graphviz import Source
+
 # random.seed(1)
 
 def rid(k=6):
@@ -195,47 +197,6 @@ class Node(Tree):
                 continue
         return nodes_list
 
-    def _to_dot_label(self, d={}):
-        if not len(d):
-            return ''
-
-        out = '['
-        for i, (key, value) in enumerate(d.items()):
-            if isinstance(value, (int, float, complex)):
-                out += '%s=%s' % (key, str(value))
-            else:
-                out += '%s="%s"' % (key, str(value))
-            if i < len(d) - 1: # last
-                out += ','
-        out += ']'
-        return out
-
-    def _to_dot_node(self, nodeFromId, nodeToId=None, props={}):
-        if nodeToId:
-            return '\n\t"%s" -- "%s" %s;' % (nodeFromId, nodeToId, self._to_dot_label(props))
-        else: # printing out single node
-            return '\n\t"%s" %s;' % (nodeFromId, self._to_dot_label(props))
-
-    def to_dot(self):
-        out = ''
-        if not self.up: # first graph node
-            out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
-            out += self._to_dot_node(self.uid, props={"label": self.name})
-        for n in self.children:
-            props = {"label": n.name + "\nuid: " + n.uid}
-            if n.loss: # marking back-mutations
-                props["color"] = "red"
-                for p in n.iter_ancestors():
-                    if n.mutation_id == p.mutation_id and p.loss:
-                        out += self._to_dot_node(n.uid, p.uid)
-            out += self._to_dot_node(n.uid, props=props)
-            out += self._to_dot_node(self.uid, n.uid)
-            if not n.is_leaf():
-                out += n.to_dot()
-
-        if not self.up: # first
-            out += '\n}\n'
-        return out
 
     def get_genotype_profile(self, genotypes):
         " Walks up to the root and maps the genotype for the current node mutation "
@@ -247,6 +208,10 @@ class Node(Tree):
             genotypes[self.mutation_id] -= 1
 
         self.up.get_genotype_profile(genotypes)
+
+    def get_random_node(self):
+        "Returns a random node"
+        return random.choice(list(self.get_cached_content().keys()))
 
     def distance(self, helper, tree):
         "Calculates the distance between this tree and another"
@@ -320,8 +285,50 @@ class Node(Tree):
                 common += 1
         return common
 
+    def _to_dot_label(self, d={}):
+        if not len(d):
+            return ''
+
+        out = '['
+        for i, (key, value) in enumerate(d.items()):
+            if isinstance(value, (int, float, complex)):
+                out += '%s=%s' % (key, str(value))
+            else:
+                out += '%s="%s"' % (key, str(value))
+            if i < len(d) - 1: # last
+                out += ','
+        out += ']'
+        return out
+
+    def _to_dot_node(self, nodeFromId, nodeToId=None, props={}):
+        if nodeToId:
+            return '\n\t"%s" -- "%s" %s;' % (nodeFromId, nodeToId, self._to_dot_label(props))
+        else: # printing out single node
+            return '\n\t"%s" %s;' % (nodeFromId, self._to_dot_label(props))
+
+    def to_dot(self):
+        out = ''
+        if not self.up: # first graph node
+            out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
+            out += self._to_dot_node(self.uid, props={"label": self.name})
+        for n in self.children:
+            props = {"label": "%s\nuid: %s" % (n.name, str(n.uid))}
+            if n.loss: # marking back-mutations
+                props["color"] = "red"
+                for p in n.iter_ancestors():
+                    if n.mutation_id == p.mutation_id and p.loss:
+                        out += self._to_dot_node(n.uid, p.uid)
+            out += self._to_dot_node(n.uid, props=props)
+            out += self._to_dot_node(self.uid, n.uid)
+            if not n.is_leaf():
+                out += n.to_dot()
+
+        if not self.up: # first
+            out += '\n}\n'
+        return out
+
     def to_string(self):
-        return "[uid: " + str(self.uid) + "; dist: " + str(self.get_distance(self.get_tree_root())) + "]"
+        return "[uid: %s; dist: %d]" % (str(self.uid), self.get_distance(self.get_tree_root()))
 
     def save(self, filename="test.gv"):
         Source(self.to_dot(), filename=filename, format="png").render()
