@@ -2,7 +2,8 @@ from Node import Node, rid
 from Operation import Operation as Op
 import random as r
 import copy
-# r.seed(1)
+import math
+r.seed(1)
 
 class Tree(object):
 
@@ -82,3 +83,45 @@ class Tree(object):
             i += 1
         
         return root
+
+    @classmethod
+    def greedy_loglikelihood(cls, helper, tree):
+        "Gets maximum likelihood of a tree"
+        nodes_list = tree.phylogeny.get_cached_content()
+        node_genotypes = [
+            [0 for j in range(helper.mutations)]
+            for i in range(len(nodes_list))
+        ]
+
+        for i, n in enumerate(nodes_list):
+            n.get_genotype_profile(node_genotypes[i])
+
+        # No need to check for empty nodes, as automatically remove them
+
+        # for i in range(node_count):
+        #     if (i in range(helper.mutations)):
+        #         node = nodes_list[i]
+        #         node.get_genotype_profile(node_genotypes[i])
+        #     else:
+        #         for j in range(helper.mutations):
+        #             node_genotypes[i][j] = 3
+
+        maximum_likelihood = 0
+
+        for i in range(helper.cells):
+            best_sigma = -1
+            best_lh = float("-inf")
+
+            for n in range(len(nodes_list)):
+                lh = 0
+                for j in range(helper.mutations):
+                    p = Op.prob(helper.matrix[i][j], node_genotypes[n][j], node_genotypes, helper, tree)
+                    lh += math.log(p)
+
+                if lh > best_lh:
+                    best_sigma = n
+                    best_lh = lh
+            tree.best_sigma[i] = best_sigma
+            maximum_likelihood += best_lh
+
+        return maximum_likelihood

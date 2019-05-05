@@ -6,7 +6,7 @@ import networkx as nx
 from ete3 import Tree
 from graphviz import Source
 
-# random.seed(1)
+random.seed(1)
 
 def rid(k=6):
     return ''.join(random.choices(string.digits + 'abcdef', k=k))
@@ -232,17 +232,21 @@ class Node(Tree):
         # print("Mutations: %d, max_weight: %d" % (helper.mutations, max_weight))
         return (helper.mutations - max_weight), max_weight_edge
 
-    def attach_clade_and_fix(self, helper, tree, clade):
-        # remove every node already in clade
+    def attach_clade(self, clade):
+        "Remove every node already in clade"
         nodes_list = list(self.get_cached_content().keys())
-        clade_nodes_list = list(clade.get_cached_content().keys())
-        for n in nodes_list:
-            for cln in clade_nodes_list:
-                if n.name == cln.name:
-                    n.delete()
-                    clade_nodes_list.remove(cln)
-                    break
+        clade_nodes_list = clade.get_cached_content()
+        for cln in clade_nodes_list:
+            for n in nodes_list:
+                if n.mutation_id != -1 and cln.name == n.name:
+                    n.delete(prevent_nondicotomic=False)
+                    nodes_list.remove(n)
+
         self.add_child(clade)
+
+    def attach_clade_and_fix(self, helper, tree, clade):
+        self.attach_clade(clade)
+
         losses_list, k_losses_list = tree.calculate_losses_list(helper.k)
         tree.losses_list = losses_list
         tree.k_losses_list = k_losses_list
