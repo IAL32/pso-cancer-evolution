@@ -12,42 +12,25 @@ def rid(k=6):
     return ''.join(random.choices(string.digits + 'abcdef', k=k))
 class Node(Tree):
 
-    def _get_uid(self):
-        return self._uid
-    def _set_uid(self, uid):
-        self._uid = uid
-
-    def _get_mutation_id(self):
-        return self._mut_id
-    def _set_mutation_id(self, mutation_id):
-        self._mut_id = mutation_id
-
-    def _get_loss(self):
-        return self._loss
-    def _set_loss(self, loss):
-        self._loss = loss
-
     def __init__(self, name, parent, mutation_id, uid, loss=False):
         self._up = parent
-        self._uid = uid
-        self._mut_id = mutation_id
-        self._loss = loss
+        self.uid = uid
+        self.mutation_id = mutation_id
+        self.loss = loss
 
         super().__init__(newick=None, name=name)
 
         if parent: # automatically add this node to its parent on creation
             parent.add_child(self)
 
-    uid = property(fget=_get_uid, fset=_set_uid)
-    mutation_id = property(fget=_get_mutation_id, fset=_set_mutation_id)
-    loss = property(fget=_get_loss, fset=_set_loss)
-
     def fix_for_losses(self, helper, tree):
+        # saving current children list, it will change if we delete
+        # the current node
         children = [c for c in self.children]
         for n in children:
             n.fix_for_losses(helper, tree)
 
-        if self in tree.losses_list:
+        if self.loss and self in tree.losses_list:
             valid = self.is_loss_valid()
             lost = self.is_mutation_already_lost(self.mutation_id)
 
@@ -194,9 +177,7 @@ class Node(Tree):
         for n in nodes_list:
             if n.up is None or n.is_leaf():
                 nodes_list.remove(n)
-                continue
         return nodes_list
-
 
     def get_genotype_profile(self, genotypes):
         " Walks up to the root and maps the genotype for the current node mutation "
@@ -316,8 +297,9 @@ class Node(Tree):
             if n.loss: # marking back-mutations
                 props["color"] = "red"
                 for p in n.iter_ancestors():
-                    if n.mutation_id == p.mutation_id and p.loss:
-                        out += self._to_dot_node(n.uid, p.uid)
+                    if n.mutation_id == p.mutation_id and not p.loss:
+                        out += self._to_dot_node(n.uid, p.uid, props={"style": "dashed", "color": "gray"})
+                        break
             out += self._to_dot_node(n.uid, props=props)
             out += self._to_dot_node(self.uid, n.uid)
             if not n.is_leaf():

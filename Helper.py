@@ -1,3 +1,4 @@
+import pickle
 class Helper(object):
     def __init__(self, matrix, mutations, mutation_names, cells, alpha, beta, k):
         self.matrix = matrix
@@ -8,3 +9,9 @@ class Helper(object):
         self.beta = beta
         self.k = k
         self.best_particle = None
+    
+    # Is this now pickleable?
+    def __getstate__(self):
+        return self.__dict__
+    def __setstate__(self, state):
+        self.__dict__.update(state)
