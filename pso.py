@@ -73,19 +73,23 @@ def particle_iteration(i, p, helper):
         d_p, (_, highest_p) = p.last_tree().phylogeny.distance(helper, p.best.copy().phylogeny)
         ran = r.random()
         if ran < .25:
-            tree_copy = helper.best_particle.best.copy()
+            tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+            tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, highest_s)
         elif ran < .50:
-            tree_copy = p.best.copy()
+            tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+            tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, highest_p)
         elif ran < .75:
             clade_to_attach = highest_s if d_s > d_p else highest_p
             # reducing the clade height to increase variety
-            # if len(clade_to_attach.children) > 0:
-            #     clade_to_attach = clade_to_attach.get_random_node()
+            if len(clade_to_attach.children) > 0:
+                clade_to_attach = clade_to_attach.get_random_node()
 
             tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
             tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, clade_to_attach)
         else:
-            tree_copy = p.last_tree().copy()
+            clade_to_attach = r.choice(p.last_tree().phylogeny.get_clades())
+            tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+            tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, highest_s)
         result = tree_operation(helper, tree_copy, op)
     return result, i, p, tree_copy
 
@@ -126,62 +130,14 @@ def pso(nparticles, iterations, matrix):
     # end = time.time()
     # print("Standard time for initialization: %f" % (start - end))
 
-    
-    processes = []
-
     print(helper.best_particle.best.likelihood)
 
     for it in range(iterations):
         print("------- Iteration %d -------" % it)
         pool = mp.Pool(mp.cpu_count())
+        processes = []
         for i, p in enumerate(particles):
             processes.append(pool.apply_async(particle_iteration, args=(i, p, helper), callback=cb_particle_iteration))
-            # # print ("Particle n. %d" % i)
-            # # print ("- loglh: %d" % p.best.likelihood)
-            # ops = list(range(0, Op.NUMBER))
-            # result = -1
-
-            # # keep trying an operation until we find a valid one
-            # while len(ops) > 0 and result != 0:
-            #     # choose a random operation
-            #     op = ops.pop(r.randint(0, len(ops) - 1))
-            #     d_s, (_, highest_s) = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.copy().phylogeny)
-            #     d_p, (_, highest_p) = p.last_tree().phylogeny.distance(helper, p.best.copy().phylogeny)
-            #     ran = r.random()
-            #     if ran < .25:
-            #         tree_copy = helper.best_particle.best.copy()
-            #     elif ran < .50:
-            #         tree_copy = p.best.copy()
-            #     elif ran < .75:
-            #         clade_to_attach = highest_s if d_s > d_p else highest_p
-            #         # reducing the clade height to increase variety
-            #         # if len(clade_to_attach.children) > 0:
-            #         #     clade_to_attach = clade_to_attach.get_random_node()
-
-            #         tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
-            #         tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, clade_to_attach)
-            #     else:
-            #         tree_copy = p.last_tree().copy()
-            #     result = tree_operation(helper, tree_copy, op)
-
-            # # updating log likelihood and bests
-            # if result == 0:
-            #     p.operations[op] += 1
-            #     # print("Operation %d" % (tree_copy.operation.type))
-            #     lh = greedy_tree_loglikelihood(helper, tree_copy)
-            #     tree_copy.likelihood = lh
-            #     p.trees.append(tree_copy)
-
-            #     if lh > p.best.likelihood:
-            #         # updating particle best
-            #         decreased = (lh - p.best.likelihood) / p.best.likelihood * 100
-            #         print("- !! Found new particle best, previous: %d, now: %d, decreased by %f%%" % (p.best.likelihood, lh, decreased))
-            #         p.best = tree_copy
-            #     if lh > helper.best_particle.best.likelihood:
-            #         # updating swarm best
-            #         decreased = (lh - helper.best_particle.best.likelihood) / helper.best_particle.best.likelihood * 100
-            #         print("- !!!!! Found new swarm best, previous: %d, now: %d, decreased by %f%%" % (helper.best_particle.best.likelihood, lh, decreased))
-            #         helper.best_particle = p
 
         for p in processes:
             p.get()
