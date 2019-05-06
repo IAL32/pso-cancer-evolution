@@ -45,11 +45,14 @@ class Operation(object):
         cached_nodes = tree.phylogeny.get_cached_content()
         keys = list(cached_nodes.keys())
         # select a random node
-        node = r.choice(keys)
-
+        node = None
         # node has no parent, hence cannot add a back mutation
-        if (node.up == None or node.up.up == None):
-            return 1
+        # keep trying until we find a suitable node
+        while (node == None or node.up == None or node.up.up == None):
+            node = r.choice(keys)
+            keys.remove(node)
+
+
         # if losses list has reached its maximum, then we can't procede
         if (len(tree.losses_list) >= max_losses):
             return 1
@@ -58,11 +61,14 @@ class Operation(object):
         candidates = [p for p in node.iter_ancestors() if (p.loss == False)]
 
         # selecting one random ancestor
-        candidate = r.choice(candidates)
 
+        candidate = None
         # if the ancestor is the root, we cannot procede
-        if (candidate.mutation_id == -1):
-            return 1
+        # keep on trying until we find a proper candidate
+        while (candidate == None or candidate.mutation_id == -1):
+            candidate = r.choice(candidates)
+            candidates.remove(candidate)
+
         # Ensuring we have no more than k mutations per mutation type
         if (tree.k_losses_list[candidate.mutation_id] >= helper.k):
             return 1
