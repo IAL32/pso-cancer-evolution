@@ -172,11 +172,13 @@ class Node(Tree):
             par = par.up
 
     def get_clades(self):
+        """
+        Clades are defined as every node in the tree, excluding the root
+        """
+        if self.mutation_id != -1:
+            raise SystemError("Cannot get clades from a non-root node!")
         nodes_list = list(self.get_cached_content().keys())
-
-        for n in nodes_list:
-            if n.up is None or n.is_leaf():
-                nodes_list.remove(n)
+        nodes_list.remove(self)
         return nodes_list
 
     def get_genotype_profile(self, genotypes):
@@ -245,6 +247,9 @@ class Node(Tree):
         self.add_child(clade)
 
     def attach_clade_and_fix(self, helper, tree, clade):
+        """
+        Attaches a clade to the phylogeny tree and fixes everything
+        """
         self.attach_clade(clade)
 
         losses_list, k_losses_list = tree.calculate_losses_list(helper.k)
@@ -254,23 +259,31 @@ class Node(Tree):
 
     @classmethod
     def common_clades_mutation(cls, helper, clade1, clade2):
-        clade1_mutations = [False] * helper.mutations
-        clade2_mutations = [False] * helper.mutations
+        clade1_genotype = [0] * helper.mutations
+        clade2_genotype = [0] * helper.mutations
         common = 0
+
         # ignoring back mutations
-        for n in clade1:
-            if not n.loss:
-                clade1_mutations[n.mutation_id] = True
-        for n in clade2:
-            if not n.loss:
-                clade2_mutations[n.mutation_id] = True
-        
+        clade1.get_genotype_profile(clade1_genotype)
+        clade2.get_genotype_profile(clade2_genotype)
+
         for m in range(helper.mutations):
-            if clade1_mutations[m] and clade2_mutations[m]:
+            if clade1_genotype[m] == clade2_genotype[m]:
                 common += 1
         return common
 
     def _to_dot_label(self, d={}):
+        """
+
+        Returns a string representing the list of properties
+        indicated by d.
+        Ex.: d = {
+            "label": "name",
+            "color": "red"
+        }
+        Will result in:
+        [label="name",color="red"]
+        """
         if not len(d):
             return ''
 
