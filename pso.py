@@ -42,64 +42,66 @@ def init_particle(i, p, helper):
     return i, p
 
 def cb_particle_iteration(r):
-    result, i, p, tree_copy = r
+    result, op, p, tree_copy = r
     # updating log likelihood and bests
-    particles[i] = p
+    particles[p.number] = p
 
     if result == 0:
         lh = Tree.greedy_loglikelihood(helper, tree_copy)
+        tree_copy.likelihood = lh
+        p.trees.append(tree_copy)
         # print("Operation %d" % (tree_copy.operation.type))
-        p.operations[tree_copy.operation.type] += 1
-        if lh > p.best.likelihood:
+        if lh != helper.best_particle.best.likelihood and lh > p.best.likelihood:
             # updating particle best
-            decreased = (lh - p.best.likelihood) / p.best.likelihood * 100
-            print("- !! %d new particle best, before: %d, now: %d, decreased by %f%%" % (i, p.best.likelihood, lh, decreased))
+            decreased = (p.best.likelihood - lh) / lh * 100
+            print("- !! %d new particle best, before: %d, now: %d, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
             p.best = tree_copy
         if lh > helper.best_particle.best.likelihood:
             # updating swarm best
-            decreased = (lh - helper.best_particle.best.likelihood) / helper.best_particle.best.likelihood * 100
-            print("- !!!!! %d new swarm best, before: %d, now: %d, decreased by %f%%" % (i, helper.best_particle.best.likelihood, lh, decreased))
+            decreased = (helper.best_particle.best.likelihood - lh) / lh * 100
+            print("- !!!!! %d new swarm best, before: %d, now: %d, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
             helper.best_particle = p
-    else:
-        lh = p.last_tree().likelihood
 
-    p.trees.append(tree_copy)
-    tree_copy.likelihood = lh
-
-def particle_iteration(i, p, helper):
+def particle_iteration(p, helper):
     # print ("Particle n. %d" % i)
     # print ("- loglh: %d" % p.best.likelihood)
     ops = list(range(0, Op.NUMBER))
     result = -1
 
-    op = ops.pop(random.randint(0, len(ops) - 1))
-    # distance returns the distance between two trees,
-    # as d(T1, T2) = n. mutations - max matching
-    # and the edge connecting the two highest matching clades
+    # start = time.time()
+    # for p2 in particles:
+    #     distance, (highest_left, highest_right) = p.last_tree().phylogeny.distance(helper, p2.last_tree().phylogeny)
+    #     couple = (distance, highest_left, highest_right)
+    #     distances.append(couple)
+    #     if not lowest_distance or distance < lowest_distance[0]:
+    #         lowest_distance = couple
+    # end = time.time()
+    # print("Particle %d distance analysis with other trees took %f seconds" % (p.number, end - start))
 
-    # TODO: check if the second parameter correspond to a T2 clade
-    distances = []
-    d_s, (_, highest_s) = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.phylogeny)
-    distances.append((d_s, highest_s.copy()))
-    d_p, (_, highest_p) = p.last_tree().phylogeny.distance(helper, p.best.phylogeny)
-    distances.append((d_p, highest_p.copy()))
-    lowest_distance = (d_p, highest_p) if d_p < d_s else (d_s, highest_s)
+    lowest_distance = None
 
-    for p2 in particles:
-        distance, (_, highest) = p.last_tree().phylogeny.distance(helper, p2.last_tree().phylogeny)
-        couple = (distance, highest.copy())
-        distances.append(couple)
-        if distance < lowest_distance[0]:
-            lowest_distance = couple
+    while len(ops) > 0 and result != 0:
+        op = ops.pop(random.randint(0, len(ops) - 1))
 
-    highest_d = lowest_distance[1]
-    # global > particle's > nearest
-    tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
-    tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, highest_d)
+        # global > particle's > nearest
+        ran = random.random()
+        if ran < .33:
+            tree_copy = helper.best_particle.best.copy()
+            helper.using_best = True
+        elif ran < .66:
+            tree_copy = p.best.copy()
+        else:
+            # distances = []
+            if lowest_distance is None:
+                d_s, (highest_s_l, highest_s_r) = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.phylogeny)
+                d_p, (highest_p_l, highest_p_r) = p.last_tree().phylogeny.distance(helper, p.best.phylogeny)
+                lowest_distance_clade = highest_s_r if (d_s <= d_p) else highest_p_r
 
-    result = Op.tree_operation(helper, tree_copy, op)
+            tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+            tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, lowest_distance_clade.copy())
+        result = Op.tree_operation(helper, tree_copy, op)
 
-    return result, i, p, tree_copy
+    return result, op, p, tree_copy
 
 def pso(nparticles, iterations, matrix):
     global particles
@@ -107,15 +109,15 @@ def pso(nparticles, iterations, matrix):
     # Particle initialization
     print("Particle initialization...")
     # Random position, each tree is a binary tree at the beginning
-    particles = [Particle(helper.cells, helper.mutations, helper.mutation_names) for n in range(nparticles)]
+    particles = [Particle(helper.cells, helper.mutations, helper.mutation_names, n) for n in range(nparticles)]
 
     helper.best_particle = particles[0]
     pool = mp.Pool(mp.cpu_count())
 
     start = time.time()
     processes = []
+    # parallelizing tree initialization
     for i, p in enumerate(particles):
-        # p.last_tree().phylogeny.save("trees/tree_%d.gv" % i)
         processes.append(pool.apply_async(init_particle, args=(i, p, helper), callback=cb_init_particle))
 
     for p in processes:
@@ -138,25 +140,31 @@ def pso(nparticles, iterations, matrix):
     # end = time.time()
     # print("Standard time for initialization: %f" % (start - end))
 
-    print(helper.best_particle.best.likelihood)
-
     start_pso = time.time()
+
     best_lh = helper.best_particle.best.likelihood
+
     for it in range(iterations):
-        start_it = time.time()
         print("------- Iteration %d -------" % it)
+
+        start_it = time.time()
+
         pool = mp.Pool(mp.cpu_count())
         processes = []
-        for i, p in enumerate(particles):
-            processes.append(pool.apply_async(particle_iteration, args=(i, p, helper), callback=cb_particle_iteration))
+        for p in particles:
+            processes.append(pool.apply_async(particle_iteration, args=(p, helper), callback=cb_particle_iteration))
 
-        for p in processes:
-            p.get()
+        # before starting a new iteration we wait for every process to end
+        # for p in processes:
+        #     p.start()
+        #     print("Got it")
         pool.close()
         pool.join()
+
         end_it = time.time()
+
         print("Iteration %d completed in %f seconds" % (it, end_it - start_it))
-        print("Likelihood decreased by %f%%" % ((helper.best_particle.best.likelihood - best_lh) / best_lh * 100))
+        print("Likelihood increased by %f%%" % ((best_lh - helper.best_particle.best.likelihood) / helper.best_particle.best.likelihood * 100))
 
         if helper.best_particle.best.likelihood > best_lh:
             best_lh = helper.best_particle.best.likelihood
