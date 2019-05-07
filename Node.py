@@ -196,6 +196,16 @@ class Node(Tree):
         "Returns a random node"
         return random.choice(list(self.get_cached_content().keys()))
 
+    def mutation_number(self, helper):
+        sum = 0
+        # sommo il numero di mutazioni acquisite per ogni nodo dell'albero
+        for n in self.get_cached_content():
+            n_genotype = [0] * helper.mutations
+            n.get_genotype_profile(n_genotype)
+            for m in n_genotype:
+                sum += m
+        return sum
+
     def distance(self, helper, tree):
         "Calculates the distance between this tree and another"
         clades_t1 = self.get_clades()
@@ -207,32 +217,32 @@ class Node(Tree):
         edges = []
         weights = []
 
+        mutations_t1 = self.mutation_number(helper)
+        mutations_t2 = tree.mutation_number(helper)
+
         for cl1 in clades_t1:
             for cl2 in clades_t2:
-                # w(e) = n. mutazioni comuni ai clade
+                # w(e) = n. common mutations between the two clades
                 w = Node.common_clades_mutation(helper, cl1, cl2)
                 edges.append((cl1, cl2))
                 weights.append(w)
                 G.add_edge(cl1, cl2, weight=w)
 
-        # matching di peso massimo
+        # max weight matching
         max_matching = list(nx.algorithms.matching.max_weight_matching(G))
-        # highly inconvenient, would have preferred the graph with the weights attached,
-        # or to be able to choose if I want a Graph, a list of tuples or whatever
-        max_weight = None
-        max_weight_edge = None
-        for (kk, vv) in max_matching:
-            i = 0
-            for (k, v) in edges:
-                if kk.name == k.name and vv.name == v.name or kk.name == v.name and vv.name == k.name:
-                    break
-                i += 1
 
-            if max_weight is None or max_weight < weights[i]:
-                max_weight = weights[i]
-                max_weight_edge = edges[i]
-        # print("Mutations: %d, max_weight: %d" % (helper.mutations, max_weight))
-        return (helper.mutations - max_weight), max_weight_edge
+        max_weight = 0
+        print ("Max Matching edges: %d" % len(max_matching))
+        for (kk, vv) in max_matching:
+            # searching for that edge position
+            for i, (k, v) in enumerate(edges):
+                if kk == k and vv == v or kk == v and vv == k:
+                    max_weight += weights[i]
+                    break
+
+        print("mut_t1: %d, mut_t2: %d, max_weight: %d" % (mutations_t1, mutations_t2, max_weight))
+        distance = max(mutations_t1, mutations_t2) - max_weight
+        return distance
 
     def attach_clade(self, clade):
         "Remove every node already in clade"
@@ -268,7 +278,7 @@ class Node(Tree):
         clade2.get_genotype_profile(clade2_genotype)
 
         for m in range(helper.mutations):
-            if clade1_genotype[m] == clade2_genotype[m]:
+            if clade1_genotype[m] == clade2_genotype[m] == 1:
                 common += 1
         return common
 

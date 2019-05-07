@@ -78,11 +78,9 @@ def particle_iteration(p, helper):
     # end = time.time()
     # print("Particle %d distance analysis with other trees took %f seconds" % (p.number, end - start))
 
-    lowest_distance = None
-
     while len(ops) > 0 and result != 0:
         op = ops.pop(random.randint(0, len(ops) - 1))
-
+ 
         # global > particle's > nearest
         ran = random.random()
         if ran < .33:
@@ -91,14 +89,17 @@ def particle_iteration(p, helper):
         elif ran < .66:
             tree_copy = p.best.copy()
         else:
-            # distances = []
-            if lowest_distance is None:
-                d_s, (highest_s_l, highest_s_r) = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.phylogeny)
-                d_p, (highest_p_l, highest_p_r) = p.last_tree().phylogeny.distance(helper, p.best.phylogeny)
-                lowest_distance_clade = highest_s_r if (d_s <= d_p) else highest_p_r
+            distances = []
 
-            tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
-            tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, lowest_distance_clade.copy())
+        # test con lo stesso albero
+
+        print (p.last_tree().phylogeny.distance(helper, p.last_tree().phylogeny))
+
+        # d_s = p.last_tree().phylogeny.distance(helper, helper.best_particle.best.phylogeny)
+        # d_p = p.last_tree().phylogeny.distance(helper, p.best.phylogeny)
+
+        # tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
+        # tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, lowest_distance_clade.copy())
         result = Op.tree_operation(helper, tree_copy, op)
 
     return result, op, p, tree_copy
