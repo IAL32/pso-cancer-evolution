@@ -23,6 +23,9 @@ class Node(Tree):
         if parent: # automatically add this node to its parent on creation
             parent.add_child(self)
 
+    def __str__(self):
+        return self.name + ("-" if self.loss else "")
+
     def fix_for_losses(self, helper, tree):
         # saving current children list, it will change if we delete
         # the current node
@@ -126,50 +129,21 @@ class Node(Tree):
 
     def get_clades_at_height(self, height=1):
         " Returns a list of clades at the desired height "
-        tmp = []
-        # getting only leaves from cache, faster than iterating
-        # over them
-        cached_nodes = self.get_cached_content()
-
-        for n in cached_nodes:
-            if n.is_leaf():
-                for cl in n._get_parent_at_height(height):
-                    if len(tmp) > 0:
-                        if cl not in tmp:
-                            # temporary adding clade, as it will be checked later anyways
-                            tmp.append(cl)
-                    else:
-                        tmp.append(cl)
-        clades = []
-
-        # check that every candidate clade is not an ancestor of someone else,
-        # otherwise we could get an overlap of clades
-
-        for cl in tmp:
-            add = True
-            for cl_ in tmp:
-                # skip same node
-                if not cl.uid == cl_.uid:
-                    # check all possible clades
-                    if cl_.is_ancestor_of(cl):
-                        add = False
-                        break
-            if add:
-                clades.append(cl)
-
+        clades = self.get_clades()
+        for cl in clades:
+            if cl.get_height() != height:
+                clades.remove(cl)
         return clades
 
     def _get_parent_at_height(self, height=1):
-        " Support function that yields a clade at the desired height "
-        if not self.is_leaf():
-            raise SystemError("Trying to get clades from a non-leaf node")
+        " Support function that returns the parent node at the desired height "
 
         par = self.up
         climb = 0
         while (par is not None and climb < height):
-            yield par
             climb += 1
             par = par.up
+        return par
 
     def get_clades(self):
         """
@@ -197,6 +171,30 @@ class Node(Tree):
         return random.choice(list(self.get_cached_content().keys()))
 
     def mutation_number(self, helper):
+        """
+            Suppose that we have the following tree:
+            T:
+                       /-c
+                    /d|
+            -germline  \-a
+                   |
+                    \-b
+            
+            Our tree can be represented by the following matrix,
+            obtained by combining every mutation genotype:
+            M(T) =
+            a = 1 0 0 1
+            b = 0 1 0 0
+            c = 0 0 1 1
+            d = 0 0 0 1
+            And the sum of mutations is the sum of very 1 in the matrix:
+            a = 1 + 0 + 0 + 1 = 2
+            b = 0 + 1 + 0 + 0 = 1
+            c = 0 + 0 + 1 + 1 = 2
+            d = 0 + 0 + 0 + 1 = 1
+            a + b + c + d     = 6
+            And 6 is the sum of the number of mutations in the tree.
+        """
         sum = 0
         # sommo il numero di mutazioni acquisite per ogni nodo dell'albero
         for n in self.get_cached_content():
@@ -207,7 +205,17 @@ class Node(Tree):
         return sum
 
     def distance(self, helper, tree):
-        "Calculates the distance between this tree and another"
+        """
+            Calculates the distance between this tree and another.
+            Tree: if compared with the same tree, it has to be a copy of it,
+            not using the same reference, otherwise we will get errors.
+            The formula we use in order to calculate the distance between two trees
+            is as follows:
+
+            d(T1, T2) = max ( sum_{x € T1}(m(x)), sum_{x € T2}(m(x)) ) - max_weight_matching(x)
+            d(T1, T2) € [ m; (m * (m + 1)) / 2 ]
+
+        """
         clades_t1 = self.get_clades()
         clades_t2 = tree.get_clades()
 
@@ -227,22 +235,31 @@ class Node(Tree):
                 edges.append((cl1, cl2))
                 weights.append(w)
                 G.add_edge(cl1, cl2, weight=w)
-
         # max weight matching
-        max_matching = list(nx.algorithms.matching.max_weight_matching(G))
 
+        max_matching = list(nx.algorithms.matching.max_weight_matching(G))
         max_weight = 0
-        print ("Max Matching edges: %d" % len(max_matching))
         for (kk, vv) in max_matching:
             # searching for that edge position
             for i, (k, v) in enumerate(edges):
                 if kk == k and vv == v or kk == v and vv == k:
                     max_weight += weights[i]
                     break
-
-        print("mut_t1: %d, mut_t2: %d, max_weight: %d" % (mutations_t1, mutations_t2, max_weight))
+        print (max_matching)
         distance = max(mutations_t1, mutations_t2) - max_weight
+
         return distance
+
+    def back_mutation_ancestry(self):
+        """
+            Returns a list of nodes representing where a back mutation
+            happened. Mostly used to know where NOT to cut.
+        """
+        back_mutations = []
+        for p in self.iter_ancestors():
+            if p.loss:
+                back_mutations.append(p)
+        return back_mutations
 
     def attach_clade(self, clade):
         "Remove every node already in clade"
@@ -269,6 +286,30 @@ class Node(Tree):
 
     @classmethod
     def common_clades_mutation(cls, helper, clade1, clade2):
+        """
+            This function can be seen as the logic and between
+            two binary strings, and then the sum between every element.
+            Suppose we have the following trees:
+            T1:
+                       /-c
+                    /d|
+            -germline  \-a
+                   |
+                    \-b
+            T2:
+                       /-d
+                    /c|
+            -germline  \-b
+                   |
+                    \-a
+            
+            And suppose we are comparing the clades c1 and b2.
+            genotype(c1) = [0 0 1 1]
+            genotype(b2) = [0 1 1 0]
+            logic_and = [0 0 1 1] & [0 1 1 0] = [0 0 1 0]
+            sum = 0 + 0 + 1 + 0 = 1
+        """
+
         clade1_genotype = [0] * helper.mutations
         clade2_genotype = [0] * helper.mutations
         common = 0
@@ -314,9 +355,9 @@ class Node(Tree):
         else: # printing out single node
             return '\n\t"%s" %s;' % (nodeFromId, self._to_dot_label(props))
 
-    def to_dot(self):
+    def to_dot(self, root=False):
         out = ''
-        if not self.up: # first graph node
+        if not self.up or root: # first graph node
             out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
             out += self._to_dot_node(self.uid, props={"label": self.name})
         for n in self.children:
