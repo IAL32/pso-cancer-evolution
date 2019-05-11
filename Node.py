@@ -26,7 +26,7 @@ class Node(Tree):
     def __str__(self):
         return self.name + ("-" if self.loss else "")
 
-    def fix_for_losses(self, helper, tree):
+    def fix_for_losses(self, helper, tree, delete_only=False):
         # saving current children list, it will change if we delete
         # the current node
         children = [c for c in self.children]
@@ -38,7 +38,10 @@ class Node(Tree):
             lost = self.is_mutation_already_lost(self.mutation_id)
 
             if (not valid) or lost:
-                self.delete_b(helper, tree)
+                if not delete_only:
+                    self.delete_b(helper, tree)
+                else:
+                    self.delete(prevent_nondicotomic=False)
     
     def delete_b(self, helper, tree):
         tree.losses_list.remove(self)
@@ -67,10 +70,12 @@ class Node(Tree):
             up.add_child(new_child)
             c._copy_until_depth(depth - 1, new_child)
 
-    def is_loss_valid(self):
+    def is_loss_valid(self, mutation_id=None):
         """ Checks if current node mutation is valid up until the root node """
+        if mutation_id is None:
+            mutation_id = self.mutation_id
         for par in self.iter_ancestors():
-            if par.mutation_id == self.mutation_id:
+            if par.mutation_id == mutation_id:
                 return True
         return False
 
@@ -106,10 +111,13 @@ class Node(Tree):
         self.detach()
         node_reattach.add_child(self)
         return 0
-    
+
+    def get_depth(self):
+        ancestors = [n for n in self.iter_ancestors()]
+        return len(ancestors)
+
     def get_height(self):
         "Returns the tree height from the current node"
-        
         height = 0
         for child in self.children:
             height = max(height, child.get_height())
@@ -127,12 +135,33 @@ class Node(Tree):
         self.copy_from(node)
         node.copy_from(tmp_node)
 
-    def get_clades_at_height(self, height=1):
-        " Returns a list of clades at the desired height "
-        clades = self.get_clades()
-        for cl in clades:
-            if cl.get_height() != height:
-                clades.remove(cl)
+    def get_clades_max_nodes(self, max=1):
+        clades = []
+        for cl in self.get_clades():
+            if len(cl.get_cached_content()) <= max and not cl.loss:
+                clades.append(cl)
+        return clades
+
+    def get_clades_at_depth(self, depth=1):
+        " Returns a list of clades at the desired depth from leaves"
+        clades = []
+        for leaf in self.iter_leaves():
+            climb = 0
+            par = leaf.up
+            while (par is not None and climb < depth):
+                climb  += 1
+
+                # We cannot choose a clade with a loss, and
+                # the depth is defined as how high the tree should be
+                if par.loss:
+                    climb -= 1
+
+                if par.up is not None:
+                    print (par)
+                    par = par.up
+
+            if par.mutation_id != -1:
+                clades.append(par)
         return clades
 
     def _get_parent_at_height(self, height=1):
@@ -213,7 +242,7 @@ class Node(Tree):
             is as follows:
 
             d(T1, T2) = max ( sum_{x € T1}(m(x)), sum_{x € T2}(m(x)) ) - max_weight_matching(x)
-            d(T1, T2) € [ m; (m * (m + 1)) / 2 ]
+            d(T1, T2) € [ 0; (m' * (m' + 1)) / 2 - (m * (m + 1)) / 2 ]
 
         """
         clades_t1 = self.get_clades()
@@ -245,7 +274,6 @@ class Node(Tree):
                 if kk == k and vv == v or kk == v and vv == k:
                     max_weight += weights[i]
                     break
-        print (max_matching)
         distance = max(mutations_t1, mutations_t2) - max_weight
 
         return distance
@@ -260,28 +288,48 @@ class Node(Tree):
             if p.loss:
                 back_mutations.append(p)
         return back_mutations
+    
+    def check_integrity(self):
+        for n in self.traverse():
+            for c in n.children:
+                assert(c.up == n)
 
-    def attach_clade(self, clade):
+    def attach_clade(self, helper, tree, clade):
         "Remove every node already in clade"
-        nodes_list = list(self.get_cached_content().keys())
-        clade_nodes_list = clade.get_cached_content()
-        for cln in clade_nodes_list:
-            for n in nodes_list:
-                if n.mutation_id != -1 and cln.name == n.name:
-                    n.delete(prevent_nondicotomic=False)
-                    nodes_list.remove(n)
-
-        self.add_child(clade)
+        root = self.get_tree_root()
+        nodes_list = root.get_cached_content()
+        # clade.fix_for_losses(helper, tree, delete_only=True)
+        clade_nodes = clade.get_cached_content()
+        clade_to_attach = self
+        for cln in clade_nodes:
+            removed = []
+            if cln.loss:
+                if clade_to_attach.is_mutation_already_lost(cln.mutation_id):
+                    cln.delete(prevent_nondicotomic=False)
+                else:
+                    tree.losses_list.append(cln)
+                    tree.k_losses_list[cln.mutation_id] += 1
+            else:
+                for n in nodes_list:
+                    if n.mutation_id != -1 and cln.mutation_id == n.mutation_id and not n.loss:
+                        # moving up
+                        if clade_to_attach == n:
+                            clade_to_attach = n.up
+                        
+                        n.delete(prevent_nondicotomic=False)
+                        removed.append(n)
+            for r in removed:
+                nodes_list.pop(r)
+        clade_to_attach.add_child(clade)
 
     def attach_clade_and_fix(self, helper, tree, clade):
         """
         Attaches a clade to the phylogeny tree and fixes everything
         """
-        self.attach_clade(clade)
-
-        losses_list, k_losses_list = tree.calculate_losses_list(helper.k)
-        tree.losses_list = losses_list
-        tree.k_losses_list = k_losses_list
+        for n in clade.traverse():
+            if not tree.k_losses_list[n.mutation_id] < helper.k:
+                n.delete(prevent_nondicotomic=False)
+        self.attach_clade(helper, tree, clade)
         self.fix_for_losses(helper, tree)
 
     @classmethod

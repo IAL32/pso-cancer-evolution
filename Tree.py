@@ -25,10 +25,6 @@ class Tree(object):
             if n.loss:
                 losses_list.append(n)
                 k_losses_list[n.mutation_id] += 1
-
-                # sanity check
-                if k_losses_list[n.mutation_id] > k:
-                    raise SystemError("Mutation %d has too many losses!" % n.mutation_id)
         return losses_list, k_losses_list
 
     def copy(self):
@@ -95,16 +91,6 @@ class Tree(object):
 
         for i, n in enumerate(nodes_list):
             n.get_genotype_profile(node_genotypes[i])
-
-        # No need to check for empty nodes, as automatically remove them
-
-        # for i in range(node_count):
-        #     if (i in range(helper.mutations)):
-        #         node = nodes_list[i]
-        #         node.get_genotype_profile(node_genotypes[i])
-        #     else:
-        #         for j in range(helper.mutations):
-        #             node_genotypes[i][j] = 3
 
         maximum_likelihood = 0
 

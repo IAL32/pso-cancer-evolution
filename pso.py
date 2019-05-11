@@ -51,15 +51,15 @@ def cb_particle_iteration(r):
         tree_copy.likelihood = lh
         p.current_tree = tree_copy
         # print("Operation %d" % (tree_copy.operation.type))
-        if lh != helper.best_particle.best.likelihood and lh > p.best.likelihood:
+        if lh != p.best.likelihood and lh > p.best.likelihood:
             # updating particle best
             decreased = (p.best.likelihood - lh) / lh * 100
-            print("- !! %d new particle best, before: %d, now: %d, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
+            print("- !! %d new particle best, before: %f, now: %f, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
             p.best = tree_copy
         if lh > helper.best_particle.best.likelihood:
             # updating swarm best
             decreased = (helper.best_particle.best.likelihood - lh) / lh * 100
-            print("- !!!!! %d new swarm best, before: %d, now: %d, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
+            print("- !!!!! %d new swarm best, before: %f, now: %f, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
             helper.best_particle = p
 
 def particle_iteration(p, helper):
@@ -68,54 +68,96 @@ def particle_iteration(p, helper):
     ops = list(range(0, Op.NUMBER))
     result = -1
 
-    while len(ops) > 0 and result != 0:
-        op = ops.pop(random.randint(0, len(ops) - 1))
+    # while len(ops) > 0 and result != 0:
 
-        best_swarm_copy = helper.best_particle.best.copy()
-        best_particle_copy = p.best.copy()
+    op = ops.pop(random.randint(0, len(ops) - 1))
 
-        """
-        we're going to "mix" three trees:
-        - the current tree
-        The current solution that has to be modified
-        - the best swarm tree
-        This guides us to the best solution we know of
-        - the best particle tree
-        This slows down the way we get to the best solution, in order
-        to avoid getting stuck in a local optimum
+    best_swarm_copy = helper.best_particle.best.copy()
+    best_particle_copy = p.best.copy()
 
-        We "move" by copying clades from a tree into another at a given height.
+    """
+    we're going to "mix" three trees:
+    - the current tree
+    The current solution that has to be modified
+    - the best swarm tree
+    This guides us to the best solution we know of
+    - the best particle tree
+    This slows down the way we get to the best solution, in order
+    to avoid getting stuck in a local optimum
 
-        We calculate the distance between:
-        current_tree - best_swarm_tree
-        current_tree - best_particle_tree
+    We "move" by copying clades from a tree into another at a given height.
 
-        Given the formula for the distance between phylogenies:
-        d(T1, T2) = max ( sum_{x € T1}(m(x)), sum_{x € T2}(m(x)) ) - max_weight_matching(x)
+    We calculate the distance between:
+    current_tree - best_swarm_tree
+    current_tree - best_particle_tree
 
-        The more distant we are from an optimum, the faster we have to move.
-        The less distant we are from an optimu, the slower we have to move.
+    Given the formula for the distance between phylogenies:
+    d(T1, T2) = max ( sum_{x € T1}(m(x)), sum_{x € T2}(m(x)) ) - max_weight_matching(x)
 
-        How fast we move defines how high the clades we copy are, so we define it
-        as the velocity of our particle. The velocity is directly proportional to
-        how distant we are from the other tree.
-        v = d(T1, T2)
+    The more distant we are from an optimum, the faster we have to move.
+    The less distant we are from an optimu, the slower we have to move.
 
-        Also, we will randomly pick the number "n" of clades, n € [1, 3],
-        that we will pick from each tree.
-        """
+    How fast we move defines how high the clades we copy are, so we define it
+    as the velocity of our particle. The velocity is directly proportional to
+    how distant we are from the other tree.
+    v = d(T1, T2)
 
-        distance_swarm = p.current_tree.phylogeny.distance(helper, best_swarm_copy.phylogeny)
-        distance_particle = p.current_tree.phylogeny.distance(helper, best_particle_copy.phylogeny)
+    Also, we will randomly pick the number "n" of clades, n € [1, 3],
+    that we will pick from each tree.
+    """
 
-        print(distance_swarm, distance_particle)
+    distance_particle = p.current_tree.phylogeny.distance(helper, best_particle_copy.phylogeny)
+    distance_swarm = p.current_tree.phylogeny.distance(helper, best_swarm_copy.phylogeny)
+    particle_clades = best_particle_copy.phylogeny.get_clades_max_nodes(max=distance_particle)
+    swarm_clades = best_swarm_copy.phylogeny.get_clades_max_nodes(max=distance_swarm)
 
-        # best_swarm_copy.get_clades_at_height()
-        # clades_current_tree = p.current_tree.phylogeny.get_clades()
+    max_clades = 3
 
-        # tree_copy = Tree.random(helper.cells, helper.mutations, helper.mutation_names)
-        # tree_copy.phylogeny.attach_clade_and_fix(helper, tree_copy, lowest_distance_clade.copy())
-        result = Op.tree_operation(helper, tree_copy, op)
+    if distance_particle < max_clades and distance_swarm < max_clades or len(particle_clades) == 0 and len(swarm_clades) == 0:
+        tree_copy = p.current_tree.copy()
+    else:
+        particle_clades_attach = []
+        swarm_clades_attach = []
+
+        if distance_particle == 0 or len(particle_clades) == 0: # it is the same tree
+            for i in range(max_clades):
+                if len(swarm_clades) > 0:
+                    choice = random.choice(swarm_clades)
+                    swarm_clades_attach.append(choice)
+                    swarm_clades.remove(choice)
+        elif distance_swarm == 0 or len(swarm_clades) == 0: # it is the same tree
+            for i in range(max_clades):
+                if len(particle_clades) > 0:
+                    choice = random.choice(particle_clades)
+                    particle_clades_attach.append(choice)
+                    particle_clades.remove(choice)
+        else:
+            for i in range(max_clades):
+                ran = random.random()
+                if ran < .5 and len(particle_clades) > 0:
+                    # particle clade
+                    choice = random.choice(particle_clades)
+                    particle_clades_attach.append(choice)
+                    particle_clades.remove(choice)
+                elif len(swarm_clades) > 0:
+                    # swarm clade
+                    choice = random.choice(swarm_clades)
+                    swarm_clades_attach.append(choice)
+                    swarm_clades.remove(choice)
+
+        tree_copy = p.current_tree.copy()
+
+        for cl in particle_clades_attach:
+            cl_ = cl.detach().copy()
+            clade_to_attach = random.choice(tree_copy.phylogeny.get_clades())
+            clade_to_attach.attach_clade_and_fix(helper, tree_copy, cl_)
+        for cl in swarm_clades_attach:
+            cl_ = cl.detach().copy()
+            clade_to_attach = random.choice(tree_copy.phylogeny.get_clades())
+            clade_to_attach.attach_clade_and_fix(helper, tree_copy, cl_)
+
+        tree_copy.phylogeny.fix_for_losses(helper, tree_copy)
+    result = Op.tree_operation(helper, tree_copy, op)
 
     return result, op, p, tree_copy
 
@@ -163,6 +205,7 @@ def pso(nparticles, iterations, matrix):
     best_lh = helper.best_particle.best.likelihood
 
     for it in range(iterations):
+        print("------- Iteration %d -------" % it)
         for p in particles:
             cb_particle_iteration(particle_iteration(p, helper))
 
