@@ -9,16 +9,21 @@ from Operation import Operation as Op
 from Particle import Particle
 from Tree import Tree
 
-random.seed(1)
+from Data import Data
+
+# random.seed(1)
 
 # global scope for multiprocessing
 particles = []
 helper = None
+data = None
 
 def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
     global helper
     global particles
+    global data
     helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k)
+    data = Data(nparticles, iterations)
 
     pso(nparticles, iterations, matrix)
 
@@ -27,7 +32,21 @@ def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha
     #     print ("- loglh: %d" % p.best.likelihood)
     #     # p.best.phylogeny.save("trees/tree_last_%d.gv" % i)
     
-    print ("Overall best particle: lh: %f" % helper.best_particle.best.likelihood)
+    Tree.greedy_loglikelihood(helper, helper.best_particle.best, data)
+
+    print ("Number of particles: %d" % data.nofparticles)
+    print ("Number of cells: %d" % helper.cells)
+    print ("Number of mutations: %d" % helper.mutations)
+    print ("Starting likelihood: %f" % data.starting_likelihood)
+    print ("Best likelihood: %f" % helper.best_particle.best.likelihood)
+    print ("Added mutations:", helper.best_particle.best.losses_list)
+    print ("False negatives: %d" % data.false_negatives)
+    print ("False positives: %d" % data.false_positives)
+    print ("Added missing values: %d" % data.missing_values)
+    print ("PSO completed in %f seconds" % (data.pso_passed_seconds()))
+    print ("Initialization took %f seconds" % data.initialization_passed_seconds())
+    print ("Average iteration time: %f seconds" % data.average_iteration_time())
+    print ("Average particle time: %f seconds" % data.average_overall_particle())
     helper.best_particle.best.phylogeny.save("trees/best.gv")
 
 def cb_init_particle(result):
@@ -42,7 +61,7 @@ def init_particle(i, p, helper):
     return i, p
 
 def cb_particle_iteration(r):
-    result, op, p, tree_copy = r
+    i, result, op, p, tree_copy, start_time = r
     # updating log likelihood and bests
     particles[p.number] = p
 
@@ -55,16 +74,20 @@ def cb_particle_iteration(r):
             # updating particle best
             decreased = (p.best.likelihood - lh) / lh * 100
             print("- !! %d new particle best, before: %f, now: %f, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
+            data.iteration_new_particle_best[i][p.number] = lh
             p.best = tree_copy
         if lh > helper.best_particle.best.likelihood:
             # updating swarm best
             decreased = (helper.best_particle.best.likelihood - lh) / lh * 100
             print("- !!!!! %d new swarm best, before: %f, now: %f, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
+            data.iteration_new_best[i][p.number] = lh
             helper.best_particle = p
 
-def particle_iteration(p, helper):
-    # print ("Particle n. %d" % i)
-    # print ("- loglh: %d" % p.best.likelihood)
+    data.particle_iteration_times[p.number].append(data._passed_seconds(start_time, time.time()))
+
+def particle_iteration(i, p, helper):
+
+    start_time = time.time()
     ops = list(range(0, Op.NUMBER))
     result = -1
 
@@ -116,20 +139,19 @@ def particle_iteration(p, helper):
     if distance_particle < max_clades and distance_swarm < max_clades or len(particle_clades) == 0 and len(swarm_clades) == 0:
         tree_copy = p.current_tree.copy()
     else:
-        particle_clades_attach = []
-        swarm_clades_attach = []
+        clades_attach = []
 
         if distance_particle == 0 or len(particle_clades) == 0: # it is the same tree
             for i in range(max_clades):
                 if len(swarm_clades) > 0:
                     choice = random.choice(swarm_clades)
-                    swarm_clades_attach.append(choice)
+                    clades_attach.append(choice)
                     swarm_clades.remove(choice)
         elif distance_swarm == 0 or len(swarm_clades) == 0: # it is the same tree
             for i in range(max_clades):
                 if len(particle_clades) > 0:
                     choice = random.choice(particle_clades)
-                    particle_clades_attach.append(choice)
+                    clades_attach.append(choice)
                     particle_clades.remove(choice)
         else:
             for i in range(max_clades):
@@ -137,33 +159,33 @@ def particle_iteration(p, helper):
                 if ran < .5 and len(particle_clades) > 0:
                     # particle clade
                     choice = random.choice(particle_clades)
-                    particle_clades_attach.append(choice)
+                    clades_attach.append(choice)
                     particle_clades.remove(choice)
                 elif len(swarm_clades) > 0:
                     # swarm clade
                     choice = random.choice(swarm_clades)
-                    swarm_clades_attach.append(choice)
+                    clades_attach.append(choice)
                     swarm_clades.remove(choice)
 
         tree_copy = p.current_tree.copy()
 
-        for cl in particle_clades_attach:
-            cl_ = cl.detach().copy()
-            clade_to_attach = random.choice(tree_copy.phylogeny.get_clades())
-            clade_to_attach.attach_clade_and_fix(helper, tree_copy, cl_)
-        for cl in swarm_clades_attach:
+        # attaching the clades we selected before
+        # and fixing every time we add a new clade
+        for cl in clades_attach:
             cl_ = cl.detach().copy()
             clade_to_attach = random.choice(tree_copy.phylogeny.get_clades())
             clade_to_attach.attach_clade_and_fix(helper, tree_copy, cl_)
 
         tree_copy.phylogeny.fix_for_losses(helper, tree_copy)
+
     result = Op.tree_operation(helper, tree_copy, op)
 
-    return result, op, p, tree_copy
+    return i, result, op, p, tree_copy, start_time
 
 def pso(nparticles, iterations, matrix):
     global particles
     global helper
+    global data
     # Particle initialization
     print("Particle initialization...")
     # Random position, each tree is a binary tree at the beginning
@@ -172,7 +194,7 @@ def pso(nparticles, iterations, matrix):
     helper.best_particle = particles[0]
     pool = mp.Pool(mp.cpu_count())
 
-    start = time.time()
+    data.initialization_start = time.time()
     processes = []
     # parallelizing tree initialization
     for i, p in enumerate(particles):
@@ -180,11 +202,9 @@ def pso(nparticles, iterations, matrix):
 
     for p in processes:
         p.get()
-    end = time.time()
 
-    print("Initialization of %d particles: %f seconds" % (len(particles), end - start))
-
-    print ("best logarithm: %f" % helper.best_particle.best.likelihood)
+    data.initialization_end = time.time()
+    data.starting_likelihood = helper.best_particle.best.likelihood
 
     pool.close()
     pool.join()
@@ -200,14 +220,20 @@ def pso(nparticles, iterations, matrix):
     # end = time.time()
     # print("Standard time for initialization: %f" % (start - end))
 
-    start_pso = time.time()
+    data.pso_start = time.time()
 
     best_lh = helper.best_particle.best.likelihood
 
     for it in range(iterations):
+        start_it = time.time()
+
         print("------- Iteration %d -------" % it)
         for p in particles:
-            cb_particle_iteration(particle_iteration(p, helper))
+            cb_particle_iteration(particle_iteration(it, p, helper))
+
+        data.iteration_times.append(data._passed_seconds(start_it, time.time()))
+
+    data.pso_end = time.time()
 
     # # Uncomment the following for parallel computation
     # for it in range(iterations):

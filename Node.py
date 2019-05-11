@@ -6,7 +6,7 @@ import networkx as nx
 from ete3 import Tree
 from graphviz import Source
 
-random.seed(1)
+# random.seed(1)
 
 def rid(k=6):
     return ''.join(random.choices(string.digits + 'abcdef', k=k))
@@ -25,6 +25,9 @@ class Node(Tree):
 
     def __str__(self):
         return self.name + ("-" if self.loss else "")
+
+    def __repr__(self):
+        return self.name
 
     def fix_for_losses(self, helper, tree, delete_only=False):
         # saving current children list, it will change if we delete

@@ -1,7 +1,7 @@
 from Node import Node, rid
 import random as r
 
-r.seed(1)
+# r.seed(1)
 
 def accept(currentIteration, iterations):
     return r.random() < (currentIteration / iterations)
@@ -20,6 +20,7 @@ class Operation(object):
         self.node_name_1 = node_name_1
         self.node_name_2 = node_name_2
         self.node_name_3 = node_name_3
+
     @classmethod
     def tree_operation(cls, helper, tree, operation):
         if operation == cls.BACK_MUTATION:
@@ -143,23 +144,33 @@ class Operation(object):
         return 0
 
     @classmethod
-    def prob(cls, I, E, genotypes, helper, particle):
+    def prob(cls, I, E, genotypes, helper, particle, data=None):
         p = 0
         if I == 0:
             if E == 0:
+                if data:
+                    data.false_positives += 1
                 p = 1 - helper.beta
             elif E == 1:
+                if data:
+                    data.false_negatives += 1
                 p = helper.alpha
             else:
                 raise SystemError("Unknown value for E: %d" % E)
         elif I == 1:
             if E == 0:
+                if data:
+                    data.false_positives += 1
                 p = helper.beta
             elif E == 1:
+                if data:
+                    data.false_negatives += 1
                 p = 1 - helper.alpha
             else:
                 raise SystemError("Unknown value for E: %d" % E)
         elif I == 2:
+            if data:
+                data.missing_values += 1
             p = 1
         else:
             raise SystemError("Unknown value for I: %d" % I)
