@@ -222,45 +222,36 @@ def pso(nparticles, iterations, matrix):
 
     data.pso_start = time.time()
 
-    best_lh = helper.best_particle.best.likelihood
+    # # Uncomment the following for single core computation
+    # for it in range(iterations):
+    #     start_it = time.time()
+
+    #     print("------- Iteration %d -------" % it)
+    #     for p in particles:
+    #         cb_particle_iteration(particle_iteration(it, p, helper))
+
+    #     data.iteration_times.append(data._passed_seconds(start_it, time.time()))
+
+    # Uncomment the following for parallel computation
 
     for it in range(iterations):
+        print("------- Iteration %d -------" % it)
+
         start_it = time.time()
 
-        print("------- Iteration %d -------" % it)
+        pool = mp.Pool(mp.cpu_count())
+        processes = []
         for p in particles:
-            cb_particle_iteration(particle_iteration(it, p, helper))
+            processes.append(pool.apply_async(particle_iteration, args=(it, p, helper), callback=cb_particle_iteration))
+
+        # before starting a new iteration we wait for every process to end
+        # for p in processes:
+        #     p.start()
+        #     print("Got it")
+
+        pool.close()
+        pool.join()
 
         data.iteration_times.append(data._passed_seconds(start_it, time.time()))
 
     data.pso_end = time.time()
-
-    # # Uncomment the following for parallel computation
-    # for it in range(iterations):
-    #     print("------- Iteration %d -------" % it)
-
-    #     start_it = time.time()
-
-    #     pool = mp.Pool(mp.cpu_count())
-    #     processes = []
-    #     for p in particles:
-    #         processes.append(pool.apply_async(particle_iteration, args=(p, helper), callback=cb_particle_iteration))
-
-    #     # before starting a new iteration we wait for every process to end
-    #     # for p in processes:
-    #     #     p.start()
-    #     #     print("Got it")
-    #     pool.close()
-    #     pool.join()
-
-    #     end_it = time.time()
-
-    #     print("Iteration %d completed in %f seconds" % (it, end_it - start_it))
-    #     print("Likelihood increased by %f%%" % ((best_lh - helper.best_particle.best.likelihood) / helper.best_particle.best.likelihood * 100))
-
-    #     if helper.best_particle.best.likelihood > best_lh:
-    #         best_lh = helper.best_particle.best.likelihood
-
-    # end_pso = time.time()
-
-    # print("PSO completed in %f seconds" % (end_pso - start_pso))
