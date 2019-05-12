@@ -1,7 +1,7 @@
 from Node import Node, rid
 import random as r
 
-# r.seed(1)
+r.seed(1)
 
 def accept(currentIteration, iterations):
     return r.random() < (currentIteration / iterations)

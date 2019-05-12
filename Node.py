@@ -38,7 +38,7 @@ class Node(Tree):
 
         if self.loss and self in tree.losses_list:
             valid = self.is_loss_valid()
-            lost = self.is_mutation_already_lost(self.mutation_id)
+            lost = self.is_mutation_already_lost(self.mutation_id, k=helper.k)
 
             if (not valid) or lost:
                 if not delete_only:
@@ -82,12 +82,17 @@ class Node(Tree):
                 return True
         return False
 
-    def is_mutation_already_lost(self, mutation_id):
-        """ Checks if mutation is already lost in the current tree """
+    def is_mutation_already_lost(self, mutation_id, k=3):
+        """
+            Checks if mutation is already lost in the current tree,
+            accounting of the fact that that mutation can be lost up
+            to k times
+            TODO: this last part
+        """
         for par in self.iter_ancestors():
             if par.loss and par.mutation_id == mutation_id:
                 return True
-        
+
         return False
 
     def is_ancestor_of(self, node):
@@ -125,6 +130,18 @@ class Node(Tree):
         for child in self.children:
             height = max(height, child.get_height())
         return height + 1
+    
+    def get_clades_at_average_level(self, percent=.5):
+        max_height = self.get_height()
+        clades = self.get_cached_content()
+        clades_with_level = []
+        for cl in clades:
+            clade_height = cl.get_height()
+            if (clade_height / max_height * percent) <= percent:
+                clades_with_level.append(cl)
+
+        return clades_with_level
+
 
     def copy_from(self, node):
         self.uid = node.uid

@@ -1,4 +1,5 @@
-
+from Tree import Tree
+import matplotlib.pyplot as plt
 class Data(object):
 
     def __init__(self, nofparticles, iterations):
@@ -56,14 +57,55 @@ class Data(object):
         
         return averages
 
+    def average_iteration_particle_time(self):
+        average_times = [0] * self.iterations
+        for j in range(self.iterations):
+            for i in range(self.nofparticles):
+                average_times[j] += self.particle_iteration_times[i][j]
+        
+        for j in range(self.iterations):
+            average_times[j] /= self.iterations
+        
+        return average_times
+
     def average_overall_particle(self):
         p_times = self.average_particle_time()
 
         sum = 0
         for t in p_times:
             sum += t
-        
+
         return sum / self.nofparticles
 
     def _passed_seconds(self, start, end):
         return end - start
+
+    def summary(self, helper):
+        Tree.greedy_loglikelihood(helper, helper.best_particle.best, self)
+        print ("Number of particles: %d" % self.nofparticles)
+        print ("Number of iterations: %d" % self.iterations)
+        print ("Number of cells: %d" % helper.cells)
+        print ("Number of mutations: %d" % helper.mutations)
+        print ("Starting likelihood: %f" % self.starting_likelihood)
+        print ("Best likelihood: %f" % helper.best_particle.best.likelihood)
+        print ("Added mutations:", helper.best_particle.best.losses_list)
+        print ("False negatives: %d" % self.false_negatives)
+        print ("False positives: %d" % self.false_positives)
+        print ("Added missing values: %d" % self.missing_values)
+        print ("PSO completed in %f seconds" % (self.pso_passed_seconds()))
+        print ("Initialization took %f seconds" % self.initialization_passed_seconds())
+        print ("Average iteration time: %f seconds" % self.average_iteration_time())
+        print ("Average particle time: %f seconds" % self.average_overall_particle())
+
+        average_particle_time_ = self.average_particle_time()
+        plt.plot(average_particle_time_)
+        plt.ylim(bottom=0, top=max(average_particle_time_))
+        plt.savefig("results/average_particle_time.png")
+
+        plt.clf()
+        average_iteration_particle_time_ = self.average_iteration_particle_time()
+        plt.plot(average_iteration_particle_time_)
+        plt.ylim(top = max(average_iteration_particle_time_))
+        plt.savefig("results/average_iteration_particle_time.png")
+
+        helper.best_particle.best.phylogeny.save("results/best.gv")

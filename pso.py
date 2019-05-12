@@ -26,28 +26,7 @@ def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha
     data = Data(nparticles, iterations)
 
     pso(nparticles, iterations, matrix)
-
-    # for i, p in enumerate(particles):
-    #     print ("Particle n. %d" % i)
-    #     print ("- loglh: %d" % p.best.likelihood)
-    #     # p.best.phylogeny.save("trees/tree_last_%d.gv" % i)
-    
-    Tree.greedy_loglikelihood(helper, helper.best_particle.best, data)
-
-    print ("Number of particles: %d" % data.nofparticles)
-    print ("Number of cells: %d" % helper.cells)
-    print ("Number of mutations: %d" % helper.mutations)
-    print ("Starting likelihood: %f" % data.starting_likelihood)
-    print ("Best likelihood: %f" % helper.best_particle.best.likelihood)
-    print ("Added mutations:", helper.best_particle.best.losses_list)
-    print ("False negatives: %d" % data.false_negatives)
-    print ("False positives: %d" % data.false_positives)
-    print ("Added missing values: %d" % data.missing_values)
-    print ("PSO completed in %f seconds" % (data.pso_passed_seconds()))
-    print ("Initialization took %f seconds" % data.initialization_passed_seconds())
-    print ("Average iteration time: %f seconds" % data.average_iteration_time())
-    print ("Average particle time: %f seconds" % data.average_overall_particle())
-    helper.best_particle.best.phylogeny.save("trees/best.gv")
+    data.summary(helper)
 
 def cb_init_particle(result):
     i, particle = result
@@ -85,7 +64,7 @@ def cb_particle_iteration(r):
 
     data.particle_iteration_times[p.number].append(data._passed_seconds(start_time, time.time()))
 
-def particle_iteration(i, p, helper):
+def particle_iteration(it, p, helper):
 
     start_time = time.time()
     ops = list(range(0, Op.NUMBER))
@@ -131,12 +110,13 @@ def particle_iteration(i, p, helper):
 
     distance_particle = p.current_tree.phylogeny.distance(helper, best_particle_copy.phylogeny)
     distance_swarm = p.current_tree.phylogeny.distance(helper, best_swarm_copy.phylogeny)
+
     particle_clades = best_particle_copy.phylogeny.get_clades_max_nodes(max=distance_particle)
     swarm_clades = best_swarm_copy.phylogeny.get_clades_max_nodes(max=distance_swarm)
 
     max_clades = 3
 
-    if distance_particle < max_clades and distance_swarm < max_clades or len(particle_clades) == 0 and len(swarm_clades) == 0:
+    if len(particle_clades) == 0 and len(swarm_clades) == 0:
         tree_copy = p.current_tree.copy()
     else:
         clades_attach = []
@@ -161,7 +141,7 @@ def particle_iteration(i, p, helper):
                     choice = random.choice(particle_clades)
                     clades_attach.append(choice)
                     particle_clades.remove(choice)
-                elif len(swarm_clades) > 0:
+                elif ran >= .5 and len(swarm_clades) > 0:
                     # swarm clade
                     choice = random.choice(swarm_clades)
                     clades_attach.append(choice)
@@ -173,14 +153,15 @@ def particle_iteration(i, p, helper):
         # and fixing every time we add a new clade
         for cl in clades_attach:
             cl_ = cl.detach().copy()
-            clade_to_attach = random.choice(tree_copy.phylogeny.get_clades())
+            tree_copy_clades = tree_copy.phylogeny.get_clades_at_average_level(percent=it / data.iterations)
+            clade_to_attach = random.choice(tree_copy_clades)
             clade_to_attach.attach_clade_and_fix(helper, tree_copy, cl_)
 
         tree_copy.phylogeny.fix_for_losses(helper, tree_copy)
 
     result = Op.tree_operation(helper, tree_copy, op)
 
-    return i, result, op, p, tree_copy, start_time
+    return it, result, op, p, tree_copy, start_time
 
 def pso(nparticles, iterations, matrix):
     global particles
@@ -222,36 +203,37 @@ def pso(nparticles, iterations, matrix):
 
     data.pso_start = time.time()
 
-    # # Uncomment the following for single core computation
-    # for it in range(iterations):
-    #     start_it = time.time()
+    # Uncomment the following for single core computation
 
-    #     print("------- Iteration %d -------" % it)
-    #     for p in particles:
-    #         cb_particle_iteration(particle_iteration(it, p, helper))
+    for it in range(iterations):
+        start_it = time.time()
 
-    #     data.iteration_times.append(data._passed_seconds(start_it, time.time()))
+        print("------- Iteration %d -------" % it)
+        for p in particles:
+            cb_particle_iteration(particle_iteration(it, p, helper))
+
+        data.iteration_times.append(data._passed_seconds(start_it, time.time()))
 
     # Uncomment the following for parallel computation
 
-    for it in range(iterations):
-        print("------- Iteration %d -------" % it)
+    # for it in range(iterations):
+    #     print("------- Iteration %d -------" % it)
 
-        start_it = time.time()
+    #     start_it = time.time()
 
-        pool = mp.Pool(mp.cpu_count())
-        processes = []
-        for p in particles:
-            processes.append(pool.apply_async(particle_iteration, args=(it, p, helper), callback=cb_particle_iteration))
+    #     pool = mp.Pool(mp.cpu_count())
+    #     processes = []
+    #     for p in particles:
+    #         processes.append(pool.apply_async(particle_iteration, args=(it, p, helper), callback=cb_particle_iteration))
 
-        # before starting a new iteration we wait for every process to end
-        # for p in processes:
-        #     p.start()
-        #     print("Got it")
+    #     # before starting a new iteration we wait for every process to end
+    #     # for p in processes:
+    #     #     p.start()
+    #     #     print("Got it")
 
-        pool.close()
-        pool.join()
+    #     pool.close()
+    #     pool.join()
 
-        data.iteration_times.append(data._passed_seconds(start_it, time.time()))
+    #     data.iteration_times.append(data._passed_seconds(start_it, time.time()))
 
     data.pso_end = time.time()
