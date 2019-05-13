@@ -1,5 +1,5 @@
 class Helper(object):
-    def __init__(self, matrix, mutations, mutation_names, cells, alpha, beta, k):
+    def __init__(self, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2):
         self.matrix = matrix
         self.mutations = mutations
         self.mutation_names = mutation_names
@@ -7,6 +7,8 @@ class Helper(object):
         self.alpha = alpha
         self.beta = beta
         self.k = k
+        self.c1 = c1
+        self.c2 = c2
         self.best_particle = None
 
     def max_phylogeny_mutations(self):

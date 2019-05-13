@@ -2,7 +2,7 @@
 """Particle Swarm Optimization for Cancer Evolution
 
 Usage:
-    pso.py (--infile <infile> -m <mutations>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [-k=<k>] [--mutfile <mutfile>]
+    pso.py (--infile <infile> -m <mutations>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [-k=<k>] [--c1=<c1>] [--c2=<c2>] [--mutfile <mutfile>]
     pso.py -h | --help
     pso.py -v | --version
 
@@ -16,6 +16,8 @@ Options:
     -t iterations --iterations iterations   Number of iterations [default: 3].
     --alpha=<alpha>                         False negative rate [default: 0.15].
     --beta=<beta>                           False positive rate [default: 0.001].
+    --c1=<c1>                               Learning factor for particle best [default: 0.25]
+    --c2=<c2>                               Learning factor for swarm best [default: 0.75]
     -k=<k>                                  K value of Dollo(k) model used as phylogeny tree [default: 3].
 """
 
@@ -37,6 +39,8 @@ def main(argv):
     alpha = float(arguments['--alpha'])
     beta = float(arguments['--beta'])
     k = int(arguments['-k'])
+    c1 = float(arguments['--c1'])
+    c2 = float(arguments['--c2'])
 
     with open(arguments['--infile'], 'r') as f:
 
@@ -58,7 +62,7 @@ def main(argv):
         # number of cells = number of rows
         cells = matrix.shape[0]
 
-    pso.init(particles, iterations, matrix.tolist(), mutations, mutation_names, cells, alpha, beta, k)
+    pso.init(particles, iterations, matrix.tolist(), mutations, mutation_names, cells, alpha, beta, k, c1, c2)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

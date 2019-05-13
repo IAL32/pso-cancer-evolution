@@ -18,11 +18,11 @@ particles = []
 helper = None
 data = None
 
-def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k):
+def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2):
     global helper
     global particles
     global data
-    helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k)
+    helper = Helper(matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2)
     data = Data(nparticles, iterations)
 
     pso(nparticles, iterations, matrix)
@@ -136,12 +136,14 @@ def particle_iteration(it, p, helper):
         else:
             for i in range(max_clades):
                 ran = random.random()
-                if ran < .5 and len(particle_clades) > 0:
+                # learning factors, c1 and c2, alter how many clades
+                # we pick from the particle best or the swarm best
+                if ran < helper.c1 and len(particle_clades) > 0:
                     # particle clade
                     choice = random.choice(particle_clades)
                     clades_attach.append(choice)
                     particle_clades.remove(choice)
-                elif ran >= .5 and len(swarm_clades) > 0:
+                elif ran >= helper.c2 and len(swarm_clades) > 0:
                     # swarm clade
                     choice = random.choice(swarm_clades)
                     clades_attach.append(choice)
