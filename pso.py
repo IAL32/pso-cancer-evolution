@@ -4,14 +4,14 @@ import sys
 import time
 
 from Helper import Helper
-from Node import Node, rid
+from Node import Node
 from Operation import Operation as Op
 from Particle import Particle
 from Tree import Tree
 
 from Data import Data
 
-# random.seed(1)
+random.seed(1)
 
 # global scope for multiprocessing
 particles = []
@@ -44,23 +44,23 @@ def cb_particle_iteration(r):
     # updating log likelihood and bests
     particles[p.number] = p
 
-    if result == 0:
-        lh = Tree.greedy_loglikelihood(helper, tree_copy)
-        tree_copy.likelihood = lh
-        p.current_tree = tree_copy
-        # print("Operation %d" % (tree_copy.operation.type))
-        if lh != p.best.likelihood and lh > p.best.likelihood:
-            # updating particle best
-            decreased = (p.best.likelihood - lh) / lh * 100
-            print("- !! %d new particle best, before: %f, now: %f, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
-            data.iteration_new_particle_best[i][p.number] = lh
-            p.best = tree_copy
-        if lh > helper.best_particle.best.likelihood:
-            # updating swarm best
-            decreased = (helper.best_particle.best.likelihood - lh) / lh * 100
-            print("- !!!!! %d new swarm best, before: %f, now: %f, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
-            data.iteration_new_best[i][p.number] = lh
-            helper.best_particle = p
+    lh = Tree.greedy_loglikelihood(helper, tree_copy)
+    tree_copy.likelihood = lh
+    p.current_tree = tree_copy
+    # print("Operation %d" % (tree_copy.operation.type))
+    if lh != p.best.likelihood and lh > p.best.likelihood:
+        # updating particle best
+        decreased = (p.best.likelihood - lh) / lh * 100
+        print("- !! %d new particle best, before: %f, now: %f, increased by %f%%" % (p.number, p.best.likelihood, lh, decreased))
+        data.iteration_new_particle_best[i][p.number] = lh
+        p.best = tree_copy
+    if lh > helper.best_particle.best.likelihood:
+        # updating swarm best
+        decreased = (helper.best_particle.best.likelihood - lh) / lh * 100
+
+        print("- !!!!! %d new swarm best, before: %f, now: %f, increased by %f%%" % (p.number, helper.best_particle.best.likelihood, lh, decreased))
+        data.iteration_new_best[i][p.number] = lh
+        helper.best_particle = p
 
     data.particle_iteration_times[p.number].append(data._passed_seconds(start_time, time.time()))
 
@@ -173,33 +173,24 @@ def pso(nparticles, iterations, matrix):
     particles = [Particle(helper.cells, helper.mutations, helper.mutation_names, n) for n in range(nparticles)]
 
     helper.best_particle = particles[0]
-    pool = mp.Pool(mp.cpu_count())
+    # pool = mp.Pool(mp.cpu_count())
 
     data.initialization_start = time.time()
-    processes = []
+
     # parallelizing tree initialization
+    processes = []
+    # for i, p in enumerate(particles):
+    #     processes.append(pool.apply_async(init_particle, args=(i, p, helper), callback=cb_init_particle))
+
+    # pool.close()
+    # pool.join()
+
+    # non-parallel initialization
     for i, p in enumerate(particles):
-        processes.append(pool.apply_async(init_particle, args=(i, p, helper), callback=cb_init_particle))
+        cb_init_particle(init_particle(i, p, helper))
 
-    for p in processes:
-        p.get()
-
-    data.initialization_end = time.time()
     data.starting_likelihood = helper.best_particle.best.likelihood
-
-    pool.close()
-    pool.join()
-
-    # exit(1)
-
-    # start = time.time()
-    # for p in particles:
-    #     lh = greedy_tree_loglikelihood(helper, p.current_tree)
-    #     p.current_tree.likelihood = lh
-    #     if (p.current_tree.likelihood > helper.best_particle.best.likelihood):
-    #         helper.best = p
-    # end = time.time()
-    # print("Standard time for initialization: %f" % (start - end))
+    data.initialization_end = time.time()
 
     data.pso_start = time.time()
 
@@ -210,6 +201,8 @@ def pso(nparticles, iterations, matrix):
 
         print("------- Iteration %d -------" % it)
         for p in particles:
+            if it == 20 and p.number == 20:
+                p.current_tree.debug = True
             cb_particle_iteration(particle_iteration(it, p, helper))
 
         data.iteration_times.append(data._passed_seconds(start_it, time.time()))

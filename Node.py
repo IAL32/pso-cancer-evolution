@@ -6,15 +6,15 @@ import networkx as nx
 from ete3 import Tree
 from graphviz import Source
 
-# random.seed(1)
+import json
 
-def rid(k=6):
-    return ''.join(random.choices(string.digits + 'abcdef', k=k))
 class Node(Tree):
 
-    def __init__(self, name, parent, mutation_id, uid, loss=False):
+    def _get_uid(self):
+        return hex(id(self))
+
+    def __init__(self, name, parent, mutation_id, loss=False):
         self._up = parent
-        self.uid = uid
         self.mutation_id = mutation_id
         self.loss = loss
 
@@ -22,6 +22,8 @@ class Node(Tree):
 
         if parent: # automatically add this node to its parent on creation
             parent.add_child(self)
+
+    uid = property(fget=_get_uid)
 
     def __str__(self):
         return self.name + ("-" if self.loss else "")
@@ -142,16 +144,14 @@ class Node(Tree):
 
         return clades_with_level
 
-
     def copy_from(self, node):
-        self.uid = node.uid
         self.name = node.name
         self.mutation_id = node.mutation_id
         self.loss = node.loss
 
     def swap(self, node):
         """ Switch this data with with that of another node """
-        tmp_node = Node(self.name, None, self.mutation_id, self.uid, self.loss)
+        tmp_node = Node(self.name, None, self.mutation_id, self.loss)
         self.copy_from(node)
         node.copy_from(tmp_node)
 
@@ -214,10 +214,6 @@ class Node(Tree):
             genotypes[self.mutation_id] -= 1
 
         self.up.get_genotype_profile(genotypes)
-
-    def get_random_node(self):
-        "Returns a random node"
-        return random.choice(list(self.get_cached_content().keys()))
 
     def mutation_number(self, helper):
         """
@@ -445,8 +441,30 @@ class Node(Tree):
             out += '\n}\n'
         return out
 
+    def _to_json_children(self):
+        """
+            Support function for printing the json tree
+        """
+        node = {"name": self.name, "uid": self.uid, "loss": self.loss, "children": []}
+        for n in self.children:
+            node["children"].append(n._to_json_children())
+        return node
+
+    def to_json(self):
+        """
+            Returns a json string representing the current tree
+        """
+        node = {"name": self.name, "uid": self.uid, "loss": self.loss, "root": True, "children": []}
+        for n in self.children:
+            node["children"].append(n._to_json_children())
+        return json.dumps(node, indent=4)
+
     def to_string(self):
         return "[uid: %s; dist: %d]" % (str(self.uid), self.get_distance(self.get_tree_root()))
 
-    def save(self, filename="test.gv"):
-        Source(self.to_dot(), filename=filename, format="png").render()
+    def save(self, filename="test.gv", fileformat="dot"):
+        if fileformat == "dot":
+            Source(self.to_dot(), filename=filename, format="png").render()
+        elif fileformat == "json":
+            with open(filename, 'w') as f:
+                f.write(self.to_json())

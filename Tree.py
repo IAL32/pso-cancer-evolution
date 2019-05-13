@@ -1,10 +1,10 @@
-from Node import Node, rid
+from Node import Node
 from Operation import Operation as Op
 import random as r
 import copy
 import math
 
-# r.seed(1)
+r.seed(1)
 
 class Tree(object):
 
@@ -68,13 +68,13 @@ class Tree(object):
         i = 0
         while i < mutations:
             nodes.append(
-                Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
+                Node(mutation_names[rantree[i]], nodes[append_node], rantree[i])
             )
             i += 1
 
             if i < mutations:
                 nodes.append(
-                    Node(mutation_names[rantree[i]], nodes[append_node], rantree[i], rid())
+                    Node(mutation_names[rantree[i]], nodes[append_node], rantree[i])
                 )
             append_node += 1
             i += 1

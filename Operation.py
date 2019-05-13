@@ -1,4 +1,4 @@
-from Node import Node, rid
+from Node import Node
 import random as r
 
 r.seed(1)
@@ -74,7 +74,7 @@ class Operation(object):
         if (node.is_mutation_already_lost(candidate.mutation_id)):
             return 1
         #
-        node_deletion = Node(candidate.name, None, candidate.mutation_id, rid(), True)
+        node_deletion = Node(candidate.name, None, candidate.mutation_id, True)
 
         tree.losses_list.append(node_deletion)
         tree.k_losses_list[node_deletion.mutation_id] += 1
