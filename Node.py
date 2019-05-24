@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import networkx as nx
 from ete3 import Tree
 from graphviz import Source
+import operator
 
 import json
 
@@ -26,10 +27,10 @@ class Node(Tree):
     uid = property(fget=_get_uid)
 
     def __str__(self):
-        return self.name + ("-" if self.loss else "")
+        return str(self.name) + ("-" if self.loss else "")
 
     def __repr__(self):
-        return self.name
+        return str(self.name) + ("-" if self.loss else "")
 
     def fix_for_losses(self, helper, tree, delete_only=False):
         # saving current children list, it will change if we delete
@@ -132,17 +133,6 @@ class Node(Tree):
         for child in self.children:
             height = max(height, child.get_height())
         return height + 1
-    
-    def get_clades_at_average_level(self, percent=.5):
-        max_height = self.get_height()
-        clades = self.get_cached_content()
-        clades_with_level = []
-        for cl in clades:
-            clade_height = cl.get_height()
-            if (clade_height / max_height * percent) <= percent:
-                clades_with_level.append(cl)
-
-        return clades_with_level
 
     def copy_from(self, node):
         self.name = node.name
@@ -155,34 +145,18 @@ class Node(Tree):
         self.copy_from(node)
         node.copy_from(tmp_node)
 
-    def get_clades_max_nodes(self, max=1):
-        clades = []
-        for cl in self.get_clades():
-            if len(cl.get_cached_content()) <= max and not cl.loss:
-                clades.append(cl)
-        return clades
+    def get_clade_distance(self, helper, nclades, tree_mt, distance, root=False):
+        clade = None
+        clade_mut_number = None
+        nodes = self.get_clades() if not root else self.get_cached_content()
 
-    def get_clades_at_depth(self, depth=1):
-        " Returns a list of clades at the desired depth from leaves"
-        clades = []
-        for leaf in self.iter_leaves():
-            climb = 0
-            par = leaf.up
-            while (par is not None and climb < depth):
-                climb  += 1
-
-                # We cannot choose a clade with a loss, and
-                # the depth is defined as how high the tree should be
-                if par.loss:
-                    climb -= 1
-
-                if par.up is not None:
-                    print (par)
-                    par = par.up
-
-            if par.mutation_id != -1:
-                clades.append(par)
-        return clades
+        for cl in nodes:
+            mutations, mut_number = cl.mutation_number(helper)
+            if mut_number <= distance and mut_number >= tree_mt - distance:
+                if clade is None or mut_number > clade_mut_number:
+                    clade = cl
+                    clade_mut_number = mut_number
+        return clade
 
     def _get_parent_at_height(self, height=1):
         " Support function that returns the parent node at the desired height "
@@ -239,15 +213,25 @@ class Node(Tree):
             d = 0 + 0 + 0 + 1 = 1
             a + b + c + d     = 6
             And 6 is the sum of the number of mutations in the tree.
+
+            This method returns a list of tuples with two elements for each item:
+            mutations(T) = { (m, n) : m = mutation_number(n), n € T }
         """
-        sum = 0
+
         # sommo il numero di mutazioni acquisite per ogni nodo dell'albero
-        for n in self.get_cached_content():
+        nodes = self.get_cached_content()
+        mutations = []
+        s = 0
+        for n in nodes:
             n_genotype = [0] * helper.mutations
             n.get_genotype_profile(n_genotype)
+            sum_ = 0
             for m in n_genotype:
-                sum += m
-        return sum
+                sum_ += m
+
+            mutations.append((sum_, n))
+            s += sum_
+        return mutations, s
 
     def distance(self, helper, tree):
         """
@@ -270,8 +254,8 @@ class Node(Tree):
         edges = []
         weights = []
 
-        mutations_t1 = self.mutation_number(helper)
-        mutations_t2 = tree.mutation_number(helper)
+        mutations_t1, mut_number_t1 = self.mutation_number(helper)
+        mutations_t2, mut_number_t2 = tree.mutation_number(helper)
 
         for cl1 in clades_t1:
             for cl2 in clades_t2:
@@ -290,9 +274,9 @@ class Node(Tree):
                 if kk == k and vv == v or kk == v and vv == k:
                     max_weight += weights[i]
                     break
-        distance = max(mutations_t1, mutations_t2) - max_weight
+        distance = max(mut_number_t1, mut_number_t2) - max_weight
 
-        return distance
+        return distance, mutations_t1, mut_number_t1, mutations_t2, mut_number_t2
 
     def back_mutation_ancestry(self):
         """
@@ -425,7 +409,7 @@ class Node(Tree):
             out += 'graph {\n\trankdir=UD;\n\tsplines=line;\n\tnode [shape=circle]'
             out += self._to_dot_node(self.uid, props={"label": self.name})
         for n in self.children:
-            props = {"label": "%s\nuid: %s" % (n.name, str(n.uid))}
+            props = {"label": "%s" % (n.name)}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
                 for p in n.iter_ancestors():

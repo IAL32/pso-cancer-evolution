@@ -1,8 +1,6 @@
 from Node import Node
 import random as r
 
-r.seed(1)
-
 def accept(currentIteration, iterations):
     return r.random() < (currentIteration / iterations)
 
@@ -148,23 +146,24 @@ class Operation(object):
         p = 0
         if I == 0:
             if E == 0:
-                if data:
-                    data.false_positives += 1
+                # TODO: sigma
+                if data is not None:
+                    data.true_negative += 1
                 p = 1 - helper.beta
             elif E == 1:
-                if data:
+                if data is not None:
                     data.false_negatives += 1
                 p = helper.alpha
             else:
                 raise SystemError("Unknown value for E: %d" % E)
         elif I == 1:
             if E == 0:
-                if data:
+                if data is not None:
                     data.false_positives += 1
                 p = helper.beta
             elif E == 1:
-                if data:
-                    data.false_negatives += 1
+                if data is not None:
+                    data.true_positive += 1
                 p = 1 - helper.alpha
             else:
                 raise SystemError("Unknown value for E: %d" % E)

@@ -4,8 +4,6 @@ import random as r
 import copy
 import math
 
-r.seed(1)
-
 class Tree(object):
 
     def __init__(self, cells, mutations):

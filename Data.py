@@ -1,14 +1,21 @@
 from Tree import Tree
 import matplotlib.pyplot as plt
+import random
+import sys
 class Data(object):
 
-    def __init__(self, nofparticles, iterations):
+    def __init__(self, nofparticles, iterations, seed):
         self.pso_start = 0
         self.pso_end = 0
         self.initialization_start = 0
         self.initialization_end = 0
         self.initialization_times = []
         self.starting_likelihood = 0
+        if seed == -1:
+            seed = random.randrange(sys.maxsize)
+        self.seed = seed
+
+        random.seed(seed)
 
         self.nofparticles = nofparticles
         self.iterations = iterations
@@ -18,9 +25,12 @@ class Data(object):
         self.iteration_new_particle_best = [[0 for p in range(nofparticles)] for n in range(iterations)]
         self.iteration_new_best = [[0 for p in range(nofparticles)] for n in range(iterations)]
 
+        self.true_positive = 0
+        self.true_negative = 0
         self.false_negatives = 0
         self.false_positives = 0
         self.missing_values = 0
+        
 
     def pso_passed_seconds(self):
         return self._passed_seconds(self.pso_start, self.pso_end)
@@ -83,6 +93,7 @@ class Data(object):
     def summary(self, helper):
         Tree.greedy_loglikelihood(helper, helper.best_particle.best, self)
         print ("Number of particles: %d" % self.nofparticles)
+        print ("Seed used: %d" % self.seed)
         print ("Number of iterations: %d" % self.iterations)
         print ("Number of cells: %d" % helper.cells)
         print ("Number of mutations: %d" % helper.mutations)
