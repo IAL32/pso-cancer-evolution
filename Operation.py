@@ -55,16 +55,12 @@ class Operation(object):
             return 1
 
         # select our candidates amongst the ancestors
-        candidates = [p for p in node.iter_ancestors() if (p.loss == False)]
-
-        # selecting one random ancestor
-
-        candidate = None
-        # if the ancestor is the root, we cannot procede
-        candidate = r.choice(candidates)
-        if candidate == None or candidate.mutation_id == -1:
+        candidates = [p for p in node.iter_ancestors() if (p.loss == False) and (p.mutation_id != -1)]
+        if len(candidates) == 0:
             return 1
 
+        # selecting one random ancestor
+        candidate = r.choice(candidates)
         # Ensuring we have no more than k mutations per mutation type
         if (tree.k_losses_list[candidate.mutation_id] >= helper.k):
             return 1

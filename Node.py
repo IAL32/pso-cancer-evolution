@@ -15,7 +15,6 @@ class Node(Tree):
         return hex(id(self))
 
     def __init__(self, name, parent, mutation_id, loss=False):
-        self._up = parent
         self.mutation_id = mutation_id
         self.loss = loss
 
@@ -60,22 +59,6 @@ class Node(Tree):
     def find_node_by_uid(self, uid_):
         return next(self.iter_search_nodes(uid=uid_), None)
 
-    def copy_all(self):
-        cached_content = self.get_cached_content(leaves_only=False)
-        return self.copy_until_depth(len(cached_content))
-    def copy_until_depth(self, depth):
-        # root node
-        new_node = Node(self.name, None, self.mutation_id, self.uid, self.loss)
-        self._copy_until_depth(depth - 1, new_node)
-        return new_node
-    def _copy_until_depth(self, depth, up):
-        if depth == 0:
-            return
-        for c in self.children:
-            new_child = Node(c.name, None, c.mutation_id, c.uid, c.loss)
-            up.add_child(new_child)
-            c._copy_until_depth(depth - 1, new_child)
-
     def is_loss_valid(self, mutation_id=None):
         """ Checks if current node mutation is valid up until the root node """
         if mutation_id is None:
@@ -87,10 +70,7 @@ class Node(Tree):
 
     def is_mutation_already_lost(self, mutation_id, k=3):
         """
-            Checks if mutation is already lost in the current tree,
-            accounting of the fact that that mutation can be lost up
-            to k times
-            TODO: this last part
+            Checks if mutation is already lost in the current tree
         """
         for par in self.iter_ancestors():
             if par.loss and par.mutation_id == mutation_id:
@@ -445,6 +425,20 @@ class Node(Tree):
 
     def to_string(self):
         return "[uid: %s; dist: %d]" % (str(self.uid), self.get_distance(self.get_tree_root()))
+
+    def _to_tikz_node(self):
+        out = ''
+        for c in self.get_children():
+            out += c._to_tikz_node()
+        return '\n\tchild { node {%s} %s }' % (self.name, out)
+
+    def to_tikz(self):
+        nodes = self.get_cached_content()
+        out = '\\begin{tikzpicture}[sibling distance=10em,every node/.style = {shape=circle,draw, align=center}]'
+        out += '\n\\node {%s}' % self.name
+        for c in self.get_children():
+            out += c._to_tikz_node()
+        return out + ';\n\\end{tikzpicture}'
 
     def save(self, filename="test.gv", fileformat="dot"):
         if fileformat == "dot":

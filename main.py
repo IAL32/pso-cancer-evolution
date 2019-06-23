@@ -2,7 +2,7 @@
 """Particle Swarm Optimization for Cancer Evolution
 
 Usage:
-    pso.py (--infile <infile> -m <mutations>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [--k=<k>] [--c1=<c1>] [--c2=<c2>] [--seed=<seed>] [--mutfile <mutfile>]
+    pso.py (--infile <infile>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [--k=<k>] [--c1=<c1>] [--c2=<c2>] [--seed=<seed>] [--mutfile <mutfile>]
     pso.py -h | --help
     pso.py -v | --version
 
@@ -10,7 +10,6 @@ Options:
     -h --help                               Shows this screen.
     --version                               Shows version.
     -i infile --infile infile               Matrix input file.
-    -m mutations --mutations mutations      Number of mutations [default: 0].
     --mutfile mutfile                       Path of the mutation names. If this parameter is not used, then the mutations will be named progressively from 1 to mutations.
     -p particles --particles particles      Number of particles to use for PSO [default: 5].
     -t iterations --iterations iterations   Number of iterations [default: 3].
@@ -36,7 +35,6 @@ def main(argv):
 
     particles = int(arguments['--particles'])
     iterations = int(arguments['--iterations'])
-    mutations = int(arguments['--mutations'])
     alpha = float(arguments['--alpha'])
     beta = float(arguments['--beta'])
     k = int(arguments['--k'])
@@ -44,25 +42,27 @@ def main(argv):
     c2 = float(arguments['--c2'])
     seed = int(arguments['--seed'])
 
+
     with open(arguments['--infile'], 'r') as f:
-
-        if arguments['--mutfile']:
-            with open(arguments['--mutfile']) as f2:
-                mutation_names = [l.strip() for l in f2.readlines()]
-                if len(mutation_names) != mutations:
-                    raise Exception("Mutation names number file does not match command parameter!", len(mutation_names), mutations)
-        else:
-            mutation_names = [i + 1 for i in range(mutations)]
-
         # reading the file and feeding it to numpy
         # assuring that we at least have 2D array to work with
         matrix = np.atleast_2d(np.loadtxt(io.StringIO(f.read())))
 
-        if matrix.shape[1] != mutations:
-            raise Exception("The number of mutations in the input file does not match command parameter!")
-        
-        # number of cells = number of rows
-        cells = matrix.shape[0]
+    # number of mutations = number of columns
+    mutations = matrix.shape[1]
+    # number of cells = number of rows
+    cells = matrix.shape[0]
+
+    if arguments['--mutfile']:
+        with open(arguments['--mutfile']) as f2:
+            mutation_names = [l.strip() for l in f2.readlines()]
+            if len(mutation_names) != mutations:
+                raise Exception("Mutation names number in file does not match mutation number in data!", len(mutation_names), mutations)
+    else:
+        mutation_names = [i + 1 for i in range(mutations)]
+    
+    if k == mutations:
+        raise Exception("Cannot have same possibile losses as mutations")
 
     pso.init(particles, iterations, matrix.tolist(), mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
 
