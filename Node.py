@@ -428,17 +428,20 @@ class Node(Tree):
 
     def _to_tikz_node(self):
         out = ''
+        back_mutation = ''
         for c in self.get_children():
             out += c._to_tikz_node()
-        return '\n\tchild { node {%s} %s }' % (self.name, out)
+        if self.loss:
+            back_mutation = ',color=red'
+        return '\n    [{%s}%s %s]' % (self.name, back_mutation, out)
 
     def to_tikz(self):
         nodes = self.get_cached_content()
-        out = '\\begin{tikzpicture}[sibling distance=10em,every node/.style = {shape=circle,draw, align=center}]'
-        out += '\n\\node {%s}' % self.name
+        out = '\\begin{forest}\n\tfor tree={shape=circle,draw}'
+        out += '\n    [{%s} ' % self.name
         for c in self.get_children():
             out += c._to_tikz_node()
-        return out + ';\n\\end{tikzpicture}'
+        return out + ']\n\\end{forest}'
 
     def save(self, filename="test.gv", fileformat="dot"):
         if fileformat == "dot":

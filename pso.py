@@ -35,6 +35,7 @@ def cb_init_particle(result):
 def init_particle(i, p, helper):
     lh = Tree.greedy_loglikelihood(helper, p.current_tree)
     p.current_tree.likelihood = lh
+    print(p.current_tree.phylogeny.to_tikz())
     return i, p
 
 def cb_particle_iteration(r):
