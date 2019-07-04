@@ -1,7 +1,4 @@
 import random
-import string
-
-import matplotlib.pyplot as plt
 import networkx as nx
 from ete3 import Tree
 from graphviz import Source
@@ -433,12 +430,34 @@ class Node(Tree):
             out += c._to_tikz_node()
         if self.loss:
             back_mutation = ',color=red'
-        return '\n    [{%s}%s %s]' % (self.name, back_mutation, out)
+        return '\n\t[{%s}%s %s]' % (self.name, back_mutation, out)
 
     def to_tikz(self):
         nodes = self.get_cached_content()
-        out = '\\begin{forest}\n\tfor tree={shape=circle,draw}'
-        out += '\n    [{%s} ' % self.name
+        # refer to official "forest" package documentation for forked edges
+        # changed it a bit:
+        # \forestset{
+        # 	declare dimen={fork sep}{0.5em},
+        # 	forked edge'/.style={
+        # 		edge={rotate/.option=!parent.grow},
+        # 		edge path'={(!u.parent anchor) -- ++(\forestoption{fork sep},0) |- (.child anchor)},
+        # 	},
+        # 	forked edge/.style={
+        # 		on invalid={fake}{!parent.parent anchor=children},
+        # 		child anchor=parent,
+        # 		forked edge',
+        # 	},
+        # 	forked edges/.style={for nodewalk={#1}{forked edge}},
+        # 	forked edges/.default=tree,
+        # 	aligned terminal/.style={if n children=0{
+        # 		tier=terminal
+        # 	}{}},
+        # 	germline/.style={
+        # 		for tree = {grow'=0,draw,aligned terminal}, forked edges
+        # 	}
+        # }
+        out = '\\begin{forest}\n\tgermline'
+        out += '\n\t[{%s} ' % self.name
         for c in self.get_children():
             out += c._to_tikz_node()
         return out + ']\n\\end{forest}'

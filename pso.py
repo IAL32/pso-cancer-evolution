@@ -24,7 +24,8 @@ def init(nparticles, iterations, matrix, mutations, mutation_names, cells, alpha
     data = Data(nparticles, iterations, seed)
 
     pso(nparticles, iterations, matrix)
-    data.summary(helper)
+    data.helper = helper
+    return data, helper
 
 def cb_init_particle(result):
     i, particle = result
@@ -35,7 +36,6 @@ def cb_init_particle(result):
 def init_particle(i, p, helper):
     lh = Tree.greedy_loglikelihood(helper, p.current_tree)
     p.current_tree.likelihood = lh
-    print(p.current_tree.phylogeny.to_tikz())
     return i, p
 
 def cb_particle_iteration(r):
@@ -162,6 +162,19 @@ def particle_iteration(it, p, helper):
 
     return it, result, op, p, tree_copy, start_time
 
+def particle_iteration_hill(it, p, helper):
+    start_time = time.time()
+    ops = list(range(0, Op.NUMBER))
+    result = -1
+    tree_copy = p.current_tree.copy()
+    op = ops.pop(random.randint(0, len(ops) - 1))
+    lh = Tree.greedy_loglikelihood(helper, tree_copy)
+
+    if lh < tree_copy.likelihood:
+        tree_copy = p.current_tree.copy()
+    result = Op.tree_operation(helper, tree_copy, op)
+    return it, result, op, p, tree_copy, start_time
+
 def pso(nparticles, iterations, matrix):
     global particles
     global helper
@@ -200,10 +213,11 @@ def pso(nparticles, iterations, matrix):
 
         print("------- Iteration %d -------" % it)
         for p in particles:
-            if it == 20 and p.number == 20:
-                p.current_tree.debug = True
-            cb_particle_iteration(particle_iteration(it, p, helper))
-
+            # if it == 20 and p.number == 20:
+            #     p.current_tree.debug = True
+            # cb_particle_iteration(particle_iteration(it, p, helper))
+            cb_particle_iteration(particle_iteration_hill(it, p, helper))
+        data.best_iteration_likelihoods.append(helper.best_particle.best.likelihood)
         data.iteration_times.append(data._passed_seconds(start_it, time.time()))
 
     # Uncomment the following for parallel computation

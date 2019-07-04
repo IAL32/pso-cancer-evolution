@@ -1,7 +1,9 @@
 from Tree import Tree
 import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import random
 import sys
+import os
 class Data(object):
 
     def __init__(self, nofparticles, iterations, seed):
@@ -22,6 +24,7 @@ class Data(object):
         self.particle_iteration_times = [[] for p in range(nofparticles)]
         self.iteration_times = []
 
+        self.best_iteration_likelihoods = []
         self.iteration_new_particle_best = [[0 for p in range(nofparticles)] for n in range(iterations)]
         self.iteration_new_best = [[0 for p in range(nofparticles)] for n in range(iterations)]
 
@@ -86,37 +89,85 @@ class Data(object):
             sum += t
 
         return sum / self.nofparticles
+    
+    def likelihood_over_time(self):
+        likelihoods = []
+        for it in self.iteration_new_best:
+            for lh in it:
+                likelihoods.append(lh)
+        return likelihoods
 
     def _passed_seconds(self, start, end):
         return end - start
 
-    def summary(self, helper):
+    def summary(self, helper, dir):
         Tree.greedy_loglikelihood(helper, helper.best_particle.best, self)
-        print ("Number of particles: %d" % self.nofparticles)
-        print ("Seed used: %d" % self.seed)
-        print ("Number of iterations: %d" % self.iterations)
-        print ("Number of cells: %d" % helper.cells)
-        print ("Number of mutations: %d" % helper.mutations)
-        print ("Starting likelihood: %f" % self.starting_likelihood)
-        print ("Best likelihood: %f" % helper.best_particle.best.likelihood)
-        print ("Added mutations:", helper.best_particle.best.losses_list)
-        print ("False negatives: %d" % self.false_negatives)
-        print ("False positives: %d" % self.false_positives)
-        print ("Added missing values: %d" % self.missing_values)
-        print ("PSO completed in %f seconds" % (self.pso_passed_seconds()))
-        print ("Initialization took %f seconds" % self.initialization_passed_seconds())
-        print ("Average iteration time: %f seconds" % self.average_iteration_time())
-        print ("Average particle time: %f seconds" % self.average_overall_particle())
+        f = open(dir + "/results.txt", "w+")
 
-        average_particle_time_ = self.average_particle_time()
-        plt.plot(average_particle_time_)
-        plt.ylim(bottom=0, top=max(average_particle_time_))
-        plt.savefig("results/average_particle_time.png")
+        f.write("Number of particles: %d\n" % self.nofparticles)
+        f.write("Seed used: %d\n" % self.seed)
+        f.write("Number of iterations: %d\n" % self.iterations)
+        f.write("Number of cells: %d\n" % helper.cells)
+        f.write("Number of mutations: %d\n" % helper.mutations)
+        f.write("Starting likelihood: %f\n" % self.starting_likelihood)
+        f.write("Best likelihood: %f\n" % helper.best_particle.best.likelihood)
+        f.write("Added mutations: %s\n" % ', '.join(map(str, helper.best_particle.best.losses_list)))
+        f.write("False negatives: %d\n" % self.false_negatives)
+        f.write("False positives: %d\n" % self.false_positives)
+        f.write("Added missing values: %d\n" % self.missing_values)
+        f.write("PSO completed in %f seconds\n" % (self.pso_passed_seconds()))
+        f.write("Initialization took %f seconds\n" % self.initialization_passed_seconds())
+        f.write("Average iteration time: %f seconds\n" % self.average_iteration_time())
+        f.write("Average particle time: %f seconds\n" % self.average_overall_particle())
 
+        ax = plt.figure().gca()
+
+        # first subplot
+        plt.subplot(3, 1, 1)
+        plt.title("Average Particle Time")
+        plt.xlabel("Time (in seconds)")
+        plt.ylabel("Particle number")
+        avg_particle_time_ = self.average_particle_time()
+        plt.plot(avg_particle_time_)
+        plt.ylim(bottom=0, top=max(avg_particle_time_))
+
+        # second subplot
+        plt.subplot(3, 1, 2)
+        plt.title("Average Particle Time per Iteration")
+        plt.xlabel("Time (in seconds)")
+        plt.ylabel("Iteration number")
+        avg_it_particle_time = self.average_iteration_particle_time()
+        plt.plot([i for i in range(len(avg_it_particle_time))], avg_it_particle_time)
+        plt.ylim(top = max(avg_it_particle_time))
+
+        # third subplot
+        plt.subplot(3, 1, 3)
+        plt.title("Likelihood over Time")
+        plt.xlabel("Iteration number")
+        plt.ylabel("Log Likelihood")
+        plt.plot(self.best_iteration_likelihoods)
+
+        plt.tight_layout()
+        plt.savefig(dir + "/data.pdf")
+
+        helper.best_particle.best.phylogeny.save(dir + "/best.gv")
+
+        f.write("Best Tree in Tikz format:\n")
+        f.write(helper.best_particle.best.phylogeny.to_tikz())
+
+        f.close()
         plt.clf()
-        average_iteration_particle_time_ = self.average_iteration_particle_time()
-        plt.plot(average_iteration_particle_time_)
-        plt.ylim(top = max(average_iteration_particle_time_))
-        plt.savefig("results/average_iteration_particle_time.png")
 
-        helper.best_particle.best.phylogeny.save("results/best.gv")
+    @classmethod
+    def runs_summary(cls, runs, runs_data, dir):
+        likelihoods = []
+        for data in runs_data:
+            likelihoods.append(data.helper.best_particle.best.likelihood)
+
+        ax = plt.figure().gca()
+        plt.title("Likelihood per run")
+        plt.xlabel("Run number")
+        plt.ylabel("Log Likelihood")
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.plot(runs, likelihoods)
+        plt.savefig(dir + "/likelihood.pdf")

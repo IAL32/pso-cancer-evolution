@@ -2,7 +2,7 @@
 """Particle Swarm Optimization for Cancer Evolution
 
 Usage:
-    pso.py (--infile <infile>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [--k=<k>] [--c1=<c1>] [--c2=<c2>] [--seed=<seed>] [--mutfile <mutfile>]
+    pso.py (--infile <infile>) [--particles <particles>] [--iterations <iterations>] [--alpha=<alpha>] [--beta=<beta>] [--k=<k>] [--c1=<c1>] [--c2=<c2>] [--seed=<seed>] [--mutfile <mutfile>] [--multiple <runptcl>...]
     pso.py -h | --help
     pso.py -v | --version
 
@@ -23,10 +23,14 @@ Options:
 
 import io
 import sys
+import os
 
 import numpy as np
 from docopt import docopt
 
+import matplotlib.pyplot as plt
+
+from Data import Data
 import pso
 
 
@@ -41,6 +45,7 @@ def main(argv):
     c1 = float(arguments['--c1'])
     c2 = float(arguments['--c2'])
     seed = int(arguments['--seed'])
+    runs = list(map(int, arguments['<runptcl>']))
 
 
     with open(arguments['--infile'], 'r') as f:
@@ -64,7 +69,23 @@ def main(argv):
     if k == mutations:
         raise Exception("Cannot have same possibile losses as mutations")
 
-    pso.init(particles, iterations, matrix.tolist(), mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
+    matrix = matrix.tolist()
+
+    if runs:
+        runs_data = []
+        for r, ptcl in enumerate(runs):
+            print ("=== Run number %d ===" % r)
+            run_dir = "results/p%d_i%d" % (ptcl, iterations)
+            if not os.path.exists(run_dir):
+                os.makedirs(run_dir)
+            data, helper = pso.init(ptcl, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
+            data.summary(helper, run_dir)
+            runs_data.append(data)
+
+        Data.runs_summary(runs, runs_data, "results")
+
+    else:
+        pso.init(particles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
