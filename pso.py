@@ -152,11 +152,7 @@ def particle_iteration(it, p, helper):
             clade_attach = clade_attach.copy().detach()
             clade_to_attach.attach_clade_and_fix(helper, tree_copy, clade_attach)
 
-        lh = Tree.greedy_loglikelihood(helper, tree_copy)
-        if lh < tree_copy.likelihood:
-            tree_copy = p.current_tree.copy()
-
-        # tree_copy.phylogeny.fix_for_losses(helper, tree_copy)
+        tree_copy.phylogeny.fix_for_losses(helper, tree_copy)
 
     result = Op.tree_operation(helper, tree_copy, op)
 
@@ -166,12 +162,16 @@ def particle_iteration_hill(it, p, helper):
     start_time = time.time()
     ops = list(range(0, Op.NUMBER))
     result = -1
-    tree_copy = p.current_tree.copy()
-    op = ops.pop(random.randint(0, len(ops) - 1))
-    lh = Tree.greedy_loglikelihood(helper, tree_copy)
 
-    if lh < tree_copy.likelihood:
+    ran = random.random()
+    if ran < .33:
+        tree_copy = helper.best_particle.best.copy()
+    elif ran < .66:
+        tree_copy = p.best.copy()
+    else:
         tree_copy = p.current_tree.copy()
+
+    op = ops.pop(random.randint(0, len(ops) - 1))
     result = Op.tree_operation(helper, tree_copy, op)
     return it, result, op, p, tree_copy, start_time
 
@@ -215,8 +215,8 @@ def pso(nparticles, iterations, matrix):
         for p in particles:
             # if it == 20 and p.number == 20:
             #     p.current_tree.debug = True
-            # cb_particle_iteration(particle_iteration(it, p, helper))
-            cb_particle_iteration(particle_iteration_hill(it, p, helper))
+            cb_particle_iteration(particle_iteration(it, p, helper))
+            # cb_particle_iteration(particle_iteration_hill(it, p, helper))
         data.best_iteration_likelihoods.append(helper.best_particle.best.likelihood)
         data.iteration_times.append(data._passed_seconds(start_it, time.time()))
 

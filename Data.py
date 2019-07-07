@@ -171,3 +171,12 @@ class Data(object):
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         plt.plot(runs, likelihoods)
         plt.savefig(dir + "/likelihood.pdf")
+
+        f = open(dir + "/results.txt", "w+")
+        f.write("Run results table for LaTeX:\n")
+        f.write("\\begin{tabular}{*{5}{c}}\n")
+        f.write("\tParticelle & Iterazioni & Likelihood Iniziale & Likelihood Migliore & CPU Time (s) \\\\ \\midrule \\midrule\n")
+        for data in runs_data:
+            f.write("\t%s & %s & %s & %s & %s \\\\\n" % (data.nofparticles, data.iterations, data.starting_likelihood, data.helper.best_particle.best.likelihood, data.pso_passed_seconds()))
+        f.write("\\end{tabular}")
+        f.close()
