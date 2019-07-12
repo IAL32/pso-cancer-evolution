@@ -210,6 +210,13 @@ class Node(Tree):
             s += sum_
         return mutations, s
 
+    def get_clades_max_nodes(self, max=1):
+        clades = []
+        for cl in self.get_clades():
+            if len(cl.get_cached_content()) <= max and not cl.loss:
+                clades.append(cl)
+        return clades
+
     def distance(self, helper, tree):
         """
             Calculates the distance between this tree and another.
@@ -245,15 +252,21 @@ class Node(Tree):
 
         max_matching = list(nx.algorithms.matching.max_weight_matching(G))
         max_weight = 0
+        max_weight_edge = None
         for (kk, vv) in max_matching:
             # searching for that edge position
             for i, (k, v) in enumerate(edges):
                 if kk == k and vv == v or kk == v and vv == k:
-                    max_weight += weights[i]
+                    # max_weight += weights[i]
                     break
+            if max_weight == 0 or max_weight < weights[i]:
+                max_weight = weights[i]
+                max_weight_edge = edges[i]
         distance = max(mut_number_t1, mut_number_t2) - max_weight
 
-        return distance, mutations_t1, mut_number_t1, mutations_t2, mut_number_t2
+        return distance
+        # return distance, max_weight_edge
+        # return distance, mutations_t1, mut_number_t1, mutations_t2, mut_number_t2
 
     def back_mutation_ancestry(self):
         """
@@ -304,10 +317,11 @@ class Node(Tree):
         Attaches a clade to the phylogeny tree and fixes everything
         """
         for n in clade.traverse():
-            if not tree.k_losses_list[n.mutation_id] < helper.k:
+            if not tree.k_losses_list[n.mutation_id] <= helper.k:
                 n.delete(prevent_nondicotomic=False)
         self.attach_clade(helper, tree, clade)
         self.fix_for_losses(helper, tree)
+        # self.check_integrity()
 
     @classmethod
     def common_clades_mutation(cls, helper, clade1, clade2):

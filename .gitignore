@@ -132,5 +132,5 @@ dmypy.json
 
 .vscode/
 *.gv
-results/
+results*/
 *.tar.*z

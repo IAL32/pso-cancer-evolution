@@ -32,6 +32,7 @@ import matplotlib.pyplot as plt
 
 from Data import Data
 import pso
+from datetime import datetime
 
 
 def main(argv):
@@ -71,21 +72,27 @@ def main(argv):
 
     matrix = matrix.tolist()
 
+    base_dir = "results" + datetime.now().strftime("%Y%m%d%H%M%S")
+
     if runs:
         runs_data = []
         for r, ptcl in enumerate(runs):
             print ("=== Run number %d ===" % r)
-            run_dir = "results/p%d_i%d" % (ptcl, iterations)
+            run_dir = base_dir + "/p%d_i%d" % (ptcl, iterations)
             if not os.path.exists(run_dir):
                 os.makedirs(run_dir)
             data, helper = pso.init(ptcl, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
             data.summary(helper, run_dir)
             runs_data.append(data)
 
-        Data.runs_summary(runs, runs_data, "results")
+        Data.runs_summary(runs, runs_data, base_dir)
 
     else:
-        pso.init(particles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
+        run_dir = base_dir + "/p%d_i%d" % (particles, iterations)
+        if not os.path.exists(run_dir):
+            os.makedirs(run_dir)
+        data, helper = pso.init(particles, iterations, matrix, mutations, mutation_names, cells, alpha, beta, k, c1, c2, seed)
+        data.summary(helper, run_dir)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

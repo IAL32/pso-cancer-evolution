@@ -125,8 +125,8 @@ class Data(object):
         # first subplot
         plt.subplot(3, 1, 1)
         plt.title("Average Particle Time")
-        plt.xlabel("Time (in seconds)")
-        plt.ylabel("Particle number")
+        plt.xlabel("Particle number")
+        plt.ylabel("Time (in seconds)")
         avg_particle_time_ = self.average_particle_time()
         plt.plot(avg_particle_time_)
         plt.ylim(bottom=0, top=max(avg_particle_time_))
@@ -134,8 +134,8 @@ class Data(object):
         # second subplot
         plt.subplot(3, 1, 2)
         plt.title("Average Particle Time per Iteration")
-        plt.xlabel("Time (in seconds)")
-        plt.ylabel("Iteration number")
+        plt.xlabel("Iteration number")
+        plt.ylabel("Time (in seconds)")
         avg_it_particle_time = self.average_iteration_particle_time()
         plt.plot([i for i in range(len(avg_it_particle_time))], avg_it_particle_time)
         plt.ylim(top = max(avg_it_particle_time))
