@@ -31,6 +31,8 @@ class Node(Tree):
     def fix_for_losses(self, helper, tree, delete_only=False):
         # saving current children list, it will change if we delete
         # the current node
+        if helper.k == 0:
+            return
         children = [c for c in self.children]
         for n in children:
             n.fix_for_losses(helper, tree)
@@ -250,20 +252,26 @@ class Node(Tree):
                 G.add_edge(cl1, cl2, weight=w)
         # max weight matching
 
-        max_matching = list(nx.algorithms.matching.max_weight_matching(G))
+        max_matching = nx.algorithms.matching.max_weight_matching(G)
+
         max_weight = 0
         max_weight_edge = None
+        matched_weights = []
+
         for (kk, vv) in max_matching:
             # searching for that edge position
             for i, (k, v) in enumerate(edges):
                 if kk == k and vv == v or kk == v and vv == k:
                     # max_weight += weights[i]
+                    matched_weights.append(weights[i])
                     break
             if max_weight == 0 or max_weight < weights[i]:
                 max_weight = weights[i]
                 max_weight_edge = edges[i]
         distance = max(mut_number_t1, mut_number_t2) - max_weight
 
+        print(matched_weights)
+        print(max_matching)
         return distance
         # return distance, max_weight_edge
         # return distance, mutations_t1, mut_number_t1, mutations_t2, mut_number_t2
@@ -403,10 +411,10 @@ class Node(Tree):
             props = {"label": "%s" % (n.name)}
             if n.loss: # marking back-mutations
                 props["color"] = "red"
-                for p in n.iter_ancestors():
-                    if n.mutation_id == p.mutation_id and not p.loss:
-                        out += self._to_dot_node(n.uid, p.uid, props={"style": "dashed", "color": "gray"})
-                        break
+            #     for p in n.iter_ancestors():
+            #         if n.mutation_id == p.mutation_id and not p.loss:
+            #             out += self._to_dot_node(n.uid, p.uid, props={"style": "dashed", "color": "gray"})
+            #             break
             out += self._to_dot_node(n.uid, props=props)
             out += self._to_dot_node(self.uid, n.uid)
             if not n.is_leaf():

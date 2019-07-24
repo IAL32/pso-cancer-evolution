@@ -104,21 +104,40 @@ class Data(object):
         Tree.greedy_loglikelihood(helper, helper.best_particle.best, self)
         f = open(dir + "/results.txt", "w+")
 
-        f.write("Number of particles: %d\n" % self.nofparticles)
-        f.write("Seed used: %d\n" % self.seed)
-        f.write("Number of iterations: %d\n" % self.iterations)
-        f.write("Number of cells: %d\n" % helper.cells)
-        f.write("Number of mutations: %d\n" % helper.mutations)
-        f.write("Starting likelihood: %f\n" % self.starting_likelihood)
-        f.write("Best likelihood: %f\n" % helper.best_particle.best.likelihood)
-        f.write("Added mutations: %s\n" % ', '.join(map(str, helper.best_particle.best.losses_list)))
-        f.write("False negatives: %d\n" % self.false_negatives)
-        f.write("False positives: %d\n" % self.false_positives)
-        f.write("Added missing values: %d\n" % self.missing_values)
-        f.write("PSO completed in %f seconds\n" % (self.pso_passed_seconds()))
-        f.write("Initialization took %f seconds\n" % self.initialization_passed_seconds())
-        f.write("Average iteration time: %f seconds\n" % self.average_iteration_time())
-        f.write("Average particle time: %f seconds\n" % self.average_overall_particle())
+        f.write(">> Number of particles: %d\n" % self.nofparticles)
+        f.write(">> Seed used: %d\n" % self.seed)
+        f.write(">> Number of iterations: %d\n" % self.iterations)
+        f.write(">> Number of cells: %d\n" % helper.cells)
+        f.write(">> Number of mutations: %d\n" % helper.mutations)
+        f.write(">> Starting likelihood: %f\n" % self.starting_likelihood)
+        f.write(">> Best likelihood: %f\n" % helper.best_particle.best.likelihood)
+        f.write(">> Added mutations: %s\n" % ', '.join(map(str, helper.best_particle.best.losses_list)))
+        f.write(">> False negatives: %d\n" % self.false_negatives)
+        f.write(">> False positives: %d\n" % self.false_positives)
+        f.write(">> Added missing values: %d\n" % self.missing_values)
+        f.write(">> PSO completed in %f seconds\n" % (self.pso_passed_seconds()))
+        f.write(">> Initialization took %f seconds\n" % self.initialization_passed_seconds())
+        f.write(">> Average iteration time: %f seconds\n" % self.average_iteration_time())
+        f.write(">> Average particle time: %f seconds\n" % self.average_overall_particle())
+
+        f.write('>> Iteration times: \n')
+        for i in self.iteration_times:
+            f.write(str(i) + ',')
+        f.write('\n')
+        f.write('>> Best iteration likelihoods: \n')
+        for i in self.best_iteration_likelihoods:
+            f.write(str(i) + ',')
+        f.write('\n')
+        f.write('>> Iteration New Particle Best: \n')
+        for n in self.iteration_new_particle_best:
+            for p in n:
+                f.write(str(p) + ',')
+            f.write('\n')
+        f.write('>> Iteration new best: \n')
+        for n in self.iteration_new_best:
+            for p in n:
+                f.write(str(p) + ',')
+            f.write('\n')
 
         ax = plt.figure().gca()
 

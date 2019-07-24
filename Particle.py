@@ -10,6 +10,9 @@ class Particle(object):
         self.number = number
         # best tree with the best likelihood so far
         self.best = self.current_tree
+        self.climb_probability = 1.0
+
+    
 
     def __repr__(self):
         return "bl: " + str(self.best.likelihood)
