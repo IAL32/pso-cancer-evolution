@@ -22,15 +22,17 @@ private:
 
 public:
 
+    ttree( uint uid, tree& parent, tree& first_child, tree& last_child, std::string mutation_name, int mutation_id );
+
     // random tree operations
 
-    static int add_random_back_mutation( tree& tree, uint k );
+    int random_add_back_mutation( uint k );
     
-    static int delete_random_back_mutation( tree& tree );
+    int random_delete_back_mutation();
 
-    static int switch_random_nodes( tree& tree );
+    int random_delete_nodes();
 
-    static int 
+    int random_prune_regraft();
 
 };
 
