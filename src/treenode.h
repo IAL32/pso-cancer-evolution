@@ -49,7 +49,8 @@ private:
     const static std::string& generate_random_uid();
 
 public:
-    typedef std::vector<treenode *> treenodevec;
+    typedef std::vector<treenode *> tree_t;
+    typedef tree_t::const_iterator tree_const_it;
 
     treenode();
 
@@ -93,7 +94,7 @@ public:
      * @param *child Child to be removed
      * @return int& The position where the removed node was
      */
-    const int& pop_child( treenode *child );
+    const int& erase_child( treenode *child );
 
     /**
      * @brief Removes a node at the given position
@@ -130,9 +131,14 @@ public:
 
     void set_parent( treenode *parent );
 
-    treenodevec::const_iterator children_begin();
+    // TODO
+    tree_const_it children_begin();
 
-    treenodevec::const_iterator children_end();
+    // TODO
+    tree_const_it children_at( const uint& position );
+
+    // TODO
+    tree_const_it children_end();
 
 };
 

@@ -43,7 +43,7 @@ void treenode::insert_child( treenode *child )
 
 void treenode::add_child_at( treenode *child, const int& position )
 {
-    auto it_pos = children.begin() + position;
+    tree_const_it it_pos = children_at( position );
     child->set_parent( this );
     children.insert( it_pos, child );
 };
@@ -55,6 +55,23 @@ const int& treenode::append_child( treenode *child )
     return children.size();
 };
 
+const int& treenode::erase_child( treenode *child )
+{
+    tree_const_it it, ie;
+    for ( it = children_begin(); it != ie; it++ ) {
+        if ( *it == child ) {
+            children.erase( it );
+        }
+    }
+    return it - children_begin();
+};
+
+void treenode::pop_child_at( const uint& position )
+{
+    tree_const_it it = children_at( position ); 
+    children.erase( it );
+}
+
 treenode* treenode::get_parent()
 {
     return parent;
@@ -63,4 +80,8 @@ treenode* treenode::get_parent()
 void treenode::set_parent( treenode *parent )
 {
     this->parent = parent;
+}
+
+treenode::tree_const_it treenode::children_at( const uint& position ) {
+    return children.begin() + position;
 }

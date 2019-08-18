@@ -1,5 +1,5 @@
 CXX		  := g++
-CXX_FLAGS := -Wall -Wextra -std=c++14 -ggdb
+CXX_FLAGS := -Wall -Wextra -std=c++14 -ggdb -fsanitize=address
 
 BIN		:= bin
 SRC		:= src
